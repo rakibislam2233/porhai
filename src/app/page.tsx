@@ -1,52 +1,110 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
-	return (
-		<div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-				<Image className="dark:invert" src="/next.svg" alt="Next.js logo" width={180} height={38} priority />
-				<ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-					<li className="mb-2 tracking-[-.01em]">
-						Get started by editing{" "}
-						<code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-							src/app/page.tsx
-						</code>
-						.
-					</li>
-					<li className="tracking-[-.01em]">Save and see your changes instantly.</li>
-				</ol>
+import React, { useState } from 'react';
+import { PDFDocument } from '@/types/chat';
+import Dashboard from '@/components/Dashboard';
+import ProcessingScreen from '@/components/ProcessingScreen';
+import ChatPanel from '@/components/ChatPanel';
 
-				<div className="flex gap-4 items-center flex-col sm:flex-row">
-					<a
-						className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-						href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						Read our docs
-					</a>
-				</div>
-			</main>
-			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
-					Learn
-				</a>
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
-					Go to nextjs.org →
-				</a>
-			</footer>
-		</div>
-	);
+type ViewState = 'dashboard' | 'processing' | 'chat';
+
+export default function MainPage() {
+  const [view, setView] = useState<ViewState>('dashboard');
+  const [documents, setDocuments] = useState<PDFDocument[]>([
+    {
+      id: 'doc-1',
+      name: 'AI_Agents_Architectural_Design_Patterns_2026.pdf',
+      size: '2.4 MB',
+      uploadedAt: 'Active session',
+      pageCount: 16
+    },
+    {
+      id: 'doc-2',
+      name: 'Global_SaaS_User_Retention_Benchmark_Q2.pdf',
+      size: '1.8 MB',
+      uploadedAt: '3 hours ago',
+      pageCount: 24
+    },
+    {
+      id: 'doc-3',
+      name: 'Vite_HMR_Latency_Under_Isolated_Containers.pdf',
+      size: '954 KB',
+      uploadedAt: '1 day ago',
+      pageCount: 10
+    }
+  ]);
+  const [activeDoc, setActiveDoc] = useState<PDFDocument | null>(null);
+  const [processingFileName, setProcessingFileName] = useState('');
+
+  // Simulator for file upload
+  const handleUploadFile = (file: File) => {
+    // Generate page counts randomly for mockup
+    const pageCount = Math.floor(Math.random() * 25) + 5;
+
+    // Convert byte length to readable format
+    const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
+    const sizeLabel = parseFloat(sizeInMB) > 0 ? `${sizeInMB} MB` : `${(file.size / 1024).toFixed(0)} KB`;
+
+    setProcessingFileName(file.name);
+    setView('processing');
+
+    // Simulate 3-seconds extraction process
+    setTimeout(() => {
+      const newDoc: PDFDocument = {
+        id: `pdf-${Date.now()}`,
+        name: file.name,
+        size: sizeLabel,
+        uploadedAt: 'Just now',
+        pageCount: pageCount
+      };
+
+      setDocuments((prev) => [newDoc, ...prev]);
+      setActiveDoc(newDoc);
+      setView('chat');
+    }, 3000);
+  };
+
+  const handleSelectDoc = (doc: PDFDocument) => {
+    setActiveDoc(doc);
+    setView('chat');
+  };
+
+  const handleDeleteDoc = (id: string) => {
+    setDocuments((prev) => prev.filter((d) => d.id !== id));
+    if (activeDoc?.id === id) {
+      setActiveDoc(null);
+      setView('dashboard');
+    }
+  };
+
+  const handleBackToDashboard = () => {
+    setView('dashboard');
+    setActiveDoc(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 antialiased selection:bg-cyan-100 selection:text-cyan-800">
+      {view === 'dashboard' && (
+        <Dashboard
+          documents={documents}
+          onUpload={handleUploadFile}
+          onSelectDoc={handleSelectDoc}
+          onDeleteDoc={handleDeleteDoc}
+        />
+      )}
+
+      {view === 'processing' && (
+        <ProcessingScreen fileName={processingFileName} />
+      )}
+
+      {view === 'chat' && activeDoc && (
+        <ChatPanel
+          doc={activeDoc}
+          onBack={handleBackToDashboard}
+          otherDocs={documents}
+          onSelectDoc={handleSelectDoc}
+        />
+      )}
+    </div>
+  );
 }
