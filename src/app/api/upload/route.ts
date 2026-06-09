@@ -36,7 +36,6 @@ export const POST = async (request: NextRequest) => {
       status: "uploading",
     })
     .returning();
-    console.log("Doc",doc)
+  console.log("Doc", doc);
   return NextResponse.json({ presignedUrl, documentId: doc.id, key });
 };
-
