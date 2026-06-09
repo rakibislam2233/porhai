@@ -28,7 +28,7 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
         throw new Error("Document not found");
       }
       //Backblaze to presigned url and fetch the PDF as buffer
-      const url = await getReadPresignedUrl(doc.b2Key);
+      const url = await getReadPresignedUrl(doc.b2Key, this.env);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error("Failed to fetch PDF from Backblaze");

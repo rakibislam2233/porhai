@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getEnv } from "@/lib/cf-env";
 import { getDb } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -7,7 +7,7 @@ import { getReadPresignedUrl } from "@/lib/backblaze";
 import { getAuth } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const { env } = await getCloudflareContext({ async: true });
+  const env = await getEnv();
   const session = await getAuth(env).api.getSession({
     headers: req.headers,
   });
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const docsWithUrls = await Promise.all(
     docs.map(async (doc) => {
-      const b2Url = doc.b2Key ? await getReadPresignedUrl(doc.b2Key) : null;
+      const b2Url = doc.b2Key ? await getReadPresignedUrl(doc.b2Key, env) : null;
       const sizeInMB = doc.fileSize
         ? doc.fileSize > 1024 * 1024
           ? `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`

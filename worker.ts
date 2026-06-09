@@ -1,8 +1,10 @@
 // @ts-ignore `.open-next/worker.js` is generated at build time
 import openNextWorker from "./.open-next/worker.js";
-import { START_PROCESSING_PATH } from "./src/lib/process-document";
+
 export { ChatRoomDO } from "./src/durable-objects/chat-room";
 export { PorhaiWorkflow } from "./src/workflows/pdf-processor";
+
+const START_PROCESSING_PATH = "/__porhai/process-document";
 
 export default {
   fetch: async (
@@ -49,7 +51,10 @@ export default {
     return openNextWorker.fetch(request, env, ctx);
   },
 
-  async queue(batch: MessageBatch<{ type: string; documentId: string; userId: string }>, env: CloudflareEnv) {
+  async queue(
+    batch: MessageBatch<{ type: string; documentId: string; userId: string }>,
+    env: CloudflareEnv,
+  ) {
     for (const msg of batch.messages) {
       try {
         const { type, documentId, userId } = msg.body;

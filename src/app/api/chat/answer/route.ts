@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getEnv } from "@/lib/cf-env";
 import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,7 +15,7 @@ type ChunkRow = {
 };
 
 export const POST = async (request: NextRequest) => {
-  const { env } = await getCloudflareContext({ async: true });
+  const env = await getEnv();
 
   const { question, documentId, history } =
     (await request.json()) as ChatAnswerRequest;

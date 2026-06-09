@@ -71,8 +71,13 @@ export function useUpload(onSuccess?: (documentId: string) => void) {
       });
       onSuccess?.(data.documentId);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to upload document";
+      let message = "Failed to upload document";
+      if (err instanceof Error) {
+        message =
+          err.message === "Failed to fetch" || err.message.includes("fetch")
+            ? "Network error while uploading. Please try again."
+            : err.message;
+      }
       setState((prev) => ({
         ...prev,
         uploading: false,

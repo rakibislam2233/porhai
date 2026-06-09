@@ -3,14 +3,14 @@ import { uploadFileToBackblaze } from "@/lib/backblaze";
 import { getDb } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
 import { startDocumentProcessing } from "@/lib/process-document";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getEnv } from "@/lib/cf-env";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export const POST = async (request: NextRequest) => {
   try {
-    const { env } = await getCloudflareContext({ async: true });
+    const env = await getEnv();
     const session = await getAuth(env).api.getSession({
       headers: request.headers,
     });
@@ -45,7 +45,7 @@ export const POST = async (request: NextRequest) => {
     const key = `pdfs/${session.user.id}/${Date.now()}-${file.name}`;
     const buffer = await file.arrayBuffer();
 
-    await uploadFileToBackblaze(key, buffer, "application/pdf");
+    await uploadFileToBackblaze(key, buffer, "application/pdf", env);
 
     const db = getDb(env);
     const [doc] = await db
@@ -65,12 +65,15 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ documentId: doc.id });
   } catch (error) {
     console.error("Upload failed:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to upload document",
-      },
-      { status: 500 },
-    );
+
+    let message = "Failed to upload document";
+    if (error instanceof Error) {
+      message = error.message;
+      if (error.message.includes("Backblaze credentials")) {
+        message = "Storage is not configured on the server";
+      }
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 };
