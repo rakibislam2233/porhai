@@ -16,7 +16,7 @@ export function useUpload(onSuccess?: (documentId: string) => void) {
   });
 
   const upload = async (file: File) => {
-    if (!file || file.type !== "application/pdf") {
+    if (!file || (file.type !== "application/pdf" && !file.name.endsWith(".pdf"))) {
       setState((prev) => ({ ...prev, error: "Only PDF files are allowed" }));
       return;
     }
@@ -32,57 +32,51 @@ export function useUpload(onSuccess?: (documentId: string) => void) {
     setState({ uploading: true, progress: 0, error: null, documentId: null });
 
     try {
-      // Step 1: Get presigned URL from our API
-      setState((prev) => ({ ...prev, progress: 10 }));
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setState((prev) => ({ ...prev, progress: 15 }));
+
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileSize: file.size,
-        }),
+        body: formData,
       });
 
-      console.log("Upload Response", uploadRes);
+      setState((prev) => ({ ...prev, progress: 85 }));
 
-      if (!uploadRes.ok) throw new Error("Failed to initiate upload");
-      const { presignedUrl, documentId } = (await uploadRes.json()) as {
-        presignedUrl: string;
-        documentId: string;
-      };
+      const rawBody = await uploadRes.text();
+      let data: { documentId?: string; error?: string } = {};
 
-      console.log("Presigned URL:", presignedUrl);
-      // Step 2: Backblaze এ directly upload
-      setState((prev) => ({ ...prev, progress: 30 }));
-      const b2Res = await fetch(presignedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": "application/pdf" },
+      if (rawBody) {
+        try {
+          data = JSON.parse(rawBody) as { documentId?: string; error?: string };
+        } catch {
+          throw new Error("Upload failed: invalid server response");
+        }
+      }
+
+      if (!uploadRes.ok) {
+        throw new Error(data.error || `Upload failed (${uploadRes.status})`);
+      }
+
+      if (!data.documentId) {
+        throw new Error("Upload succeeded but no document ID was returned");
+      }
+
+      setState({
+        uploading: false,
+        progress: 100,
+        error: null,
+        documentId: data.documentId,
       });
-
-      console.log("Backblaze Response", b2Res);
-
-      if (!b2Res.ok) throw new Error("Failed to upload file to storage");
-
-      setState((prev) => ({ ...prev, progress: 80 }));
-
-      // Step 3: confirm uploadation to our API
-      const confirmRes = await fetch("/api/upload/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId }),
-      });
-
-      if (!confirmRes.ok)
-        throw new Error("Failed to initiate document processing");
-
-      setState({ uploading: false, progress: 100, error: null, documentId });
-      onSuccess?.(documentId);
-    } catch (err: any) {
+      onSuccess?.(data.documentId);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to upload document";
       setState((prev) => ({
         ...prev,
         uploading: false,
-        error: err.message || "Failed to upload document",
+        error: message,
       }));
     }
   };

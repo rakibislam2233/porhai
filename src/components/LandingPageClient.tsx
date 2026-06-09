@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useUpload } from "@/hooks/useUpload";
+import { Logo } from "@/components/Logo";
 import {
-  ArrowRight, FileText, Zap, Shield, Sparkles,
+  ArrowRight, Zap, Shield, Sparkles,
   Upload, ShieldCheck, User, LogOut, Loader2
 } from "lucide-react";
 
@@ -65,9 +66,8 @@ export default function LandingPageClient() {
   // Determine the upload zone label based on current state
   const getUploadLabel = () => {
     if (uploading) {
-      if (progress < 30) return "Starting upload...";
-      if (progress < 80) return "Uploading to storage...";
-      return "Processing document...";
+      if (progress < 80) return "Uploading your PDF...";
+      return "Starting document processing...";
     }
     if (isDragging) return "Drop your PDF here";
     return "Upload your PDF to begin";
@@ -78,12 +78,7 @@ export default function LandingPageClient() {
       <div className="relative z-10">
         {/* Navigation */}
         <nav className="container mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900">Porhai</span>
-          </div>
+          <Logo height={40} />
           <div className="flex items-center space-x-4">
             {session ? (
               <>
