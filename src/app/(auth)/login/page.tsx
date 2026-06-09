@@ -1,73 +1,84 @@
-import { SocialLogin } from './social-login'
+"use client";
 
-export function LoginPage() {
+import { SocialLogin } from '@/components/SocialLogin'
+import { FileText, Sparkles, ShieldCheck } from "lucide-react";
+
+export default function LoginPage() {
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Image/Brand */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-cyan-600 to-teal-700 relative overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvc3ZnPg==')] bg-repeat opacity-20" />
+    <div className="min-h-screen flex w-full bg-slate-50 font-sans">
+      {/* LEFT SIDE - Brand & Hero Graphic (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-cyan-600 relative overflow-hidden items-center justify-center p-12">
+        {/* Subtle patterned overlay (not gradient) */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] bg-repeat opacity-50" />
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-
-        <div className="relative z-10 flex flex-col justify-between h-full p-16">
-          <div>
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <span className="text-2xl font-bold text-white tracking-tight">ChatWithPDF</span>
+        <div className="relative z-10 w-full max-w-lg">
+          <div className="flex items-center space-x-3 mb-10">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <FileText className="w-6 h-6 text-cyan-600" />
             </div>
-            <h1 className="text-5xl font-bold text-white mb-4 leading-tight">
-              Chat with your PDFs<br />intelligently
-            </h1>
-            <p className="text-lg text-cyan-100 max-w-md">
-              Upload any PDF document and chat with our AI assistant. Get instant summaries, answers, and insights from your documents.
-            </p>
+            <span className="text-2xl font-bold text-white tracking-tight">Porhai</span>
           </div>
 
-          <div className="flex items-center space-x-4 text-cyan-200/60 text-sm">
-            <div className="flex -space-x-2">
+          <h1 className="text-4xl font-extrabold text-white mb-6 leading-tight tracking-tight">
+            Unlock the knowledge<br />
+            hidden in your PDFs
+          </h1>
+
+          <p className="text-base text-cyan-50 mb-12 leading-relaxed">
+            Welcome back to your AI-powered document workspace. Sign in to continue analyzing, summarizing, and chatting with your files instantly.
+          </p>
+
+          <div className="flex items-center space-x-4 bg-cyan-700 p-4 rounded-xl w-max">
+            <div className="flex -space-x-3">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-cyan-600 bg-slate-200 overflow-hidden">
+                <div key={i} className="w-8 h-8 rounded-full border-2 border-cyan-700 bg-white overflow-hidden">
                   <img src={`https://ui-avatars.com/api/?name=User${i}&background=random`} alt="" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
-            <span>Trusted by 10,000+ users</span>
+            <div className="text-sm">
+              <p className="text-white font-semibold">Join 10,000+ users</p>
+              <p className="text-cyan-200">Working smarter every day</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Right side - Login Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 bg-slate-50">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8 lg:hidden">
-            <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-xl bg-cyan-600 flex items-center justify-center">
-                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
+      {/* RIGHT SIDE - Authentication Form (Responsive) */}
+      <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative w-full lg:w-1/2 bg-white">
+        {/* Mobile Header (Only visible on small screens) */}
+        <div className="lg:hidden flex items-center space-x-2 mb-10 absolute top-8 left-6">
+          <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center">
+            <FileText className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-xl font-bold text-slate-900 tracking-tight">Porhai</span>
+        </div>
+
+        <div className="w-full max-w-[400px] mx-auto z-10">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold tracking-wide uppercase mb-5">
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Welcome Back
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
-            <p className="text-slate-500 mt-2">Sign in to continue</p>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">Sign in to your account</h2>
+            <p className="text-slate-600 text-sm">Choose your preferred provider below</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
-            <div className="lg:hidden text-center mb-8">
-              <SocialLogin type="login" />
-            </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10">
+            <SocialLogin type="login" />
 
-            <div className="hidden lg:block mb-6">
-              <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
-              <p className="text-slate-500 mt-2">Sign in to your account</p>
-            </div>
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center space-y-4">
+              <div className="flex items-center text-xs text-slate-500 space-x-1.5">
+                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                <span>Secure, passwordless authentication</span>
+              </div>
 
-            <div className="lg:hidden">
-              <SocialLogin type="login" />
+              <p className="text-sm text-slate-600">
+                Don't have an account?{' '}
+                <a href="/register" className="text-cyan-600 font-semibold transition-colors">
+                  Create one now
+                </a>
+              </p>
             </div>
           </div>
         </div>

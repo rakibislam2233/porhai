@@ -25,29 +25,7 @@
   --radius-xl: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: 240 10% 3.9%;
-    --color-foreground: 0 0% 98%;
-    --color-card: 240 10% 3.9%;
-    --color-card-foreground: 0 0% 98%;
-    --color-popover: 240 10% 3.9%;
-    --color-popover-foreground: 0 0% 98%;
-    --color-primary: 180 100% 50%;
-    --color-primary-foreground: 0 0% 98%;
-    --color-secondary: 240 3.7% 15.9%;
-    --color-secondary-foreground: 0 0% 98%;
-    --color-muted: 240 3.7% 15.9%;
-    --color-muted-foreground: 240 5% 64.9%;
-    --color-accent: 240 3.7% 15.9%;
-    --color-accent-foreground: 0 0% 98%;
-    --color-destructive: 0 62.8% 30.6%;
-    --color-destructive-foreground: 0 0% 98%;
-    --color-border: 240 3.7% 15.9%;
-    --color-input: 240 3.7% 15.9%;
-    --color-ring: 180 100% 50%;
-  }
-}
+
 
 * {
   border-color: hsl(var(--color-border));
@@ -63,23 +41,21 @@ body {
   font-family: var(--font-display);
 }
 
-/* Custom visible scrollbar track for the PDF reader */
-.custom-pdf-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  display: block;
+/* Global professional scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.custom-pdf-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-left: 1px solid #cbd5e1;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.custom-pdf-scrollbar::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
-  border-radius: 5px;
-  border: 2px solid #f1f5f9;
-}
-
-.custom-pdf-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #0891b2;
 }

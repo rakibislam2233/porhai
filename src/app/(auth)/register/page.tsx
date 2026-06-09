@@ -1,73 +1,80 @@
-import { SocialLogin } from './social-login'
+"use client";
 
-export function RegisterPage() {
+import { SocialLogin } from '@/components/SocialLogin'
+import { FileText, Sparkles, ShieldCheck } from "lucide-react";
+
+export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Image/Brand */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-cyan-600 to-teal-700 relative overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvc3ZnPg==')] bg-repeat opacity-20" />
+    <div className="min-h-screen flex w-full bg-slate-50 font-sans">
+      {/* LEFT SIDE - Brand & Hero Graphic (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-cyan-600 relative overflow-hidden items-center justify-center p-12">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] bg-repeat opacity-50" />
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-
-        <div className="relative z-10 flex flex-col justify-between h-full p-16">
-          <div>
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <span className="text-2xl font-bold text-white tracking-tight">ChatWithPDF</span>
+        <div className="relative z-10 w-full max-w-lg">
+          <div className="flex items-center space-x-3 mb-10">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <FileText className="w-6 h-6 text-cyan-600" />
             </div>
-            <h1 className="text-5xl font-bold text-white mb-4 leading-tight">
-              Start chatting with<br />your PDFs today
-            </h1>
-            <p className="text-lg text-cyan-100 max-w-md">
-              Join thousands of users who are already using AI to read and understand their documents faster than ever.
-            </p>
+            <span className="text-2xl font-bold text-white tracking-tight">Porhai</span>
           </div>
+          
+          <h1 className="text-4xl font-extrabold text-white mb-6 leading-tight tracking-tight">
+            Start chatting with<br />
+            your PDFs today
+          </h1>
+          
+          <p className="text-base text-cyan-50 mb-12 leading-relaxed">
+            Join thousands of users who are already using AI to read, extract, and understand their complex documents faster.
+          </p>
 
-          <div className="flex items-center space-x-4 text-cyan-200/60 text-sm">
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-cyan-600 bg-slate-200 overflow-hidden">
-                  <img src={`https://ui-avatars.com/api/?name=User${i}&background=random`} alt="" className="w-full h-full object-cover" />
-                </div>
+          <div className="bg-cyan-700 border border-cyan-500 rounded-xl p-5 max-w-md">
+            <div className="flex text-amber-300 mb-2 space-x-1">
+              {[...Array(5)].map((_, i) => (
+                <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
               ))}
             </div>
-            <span>Start your free trial today</span>
+            <p className="text-sm text-cyan-50 italic">"Porhai completely changed how I process research papers. I just upload them and ask questions. It's incredibly fast."</p>
+            <p className="text-xs text-white font-semibold mt-3">— Dr. Sarah Jenkins, Researcher</p>
           </div>
         </div>
       </div>
 
-      {/* Right side - Register Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 bg-slate-50">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8 lg:hidden">
-            <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-xl bg-cyan-600 flex items-center justify-center">
-                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
+      {/* RIGHT SIDE - Authentication Form (Responsive) */}
+      <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative w-full lg:w-1/2 bg-white">
+        <div className="lg:hidden flex items-center space-x-2 mb-10 absolute top-8 left-6">
+          <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center">
+            <FileText className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-xl font-bold text-slate-900 tracking-tight">Porhai</span>
+        </div>
+
+        <div className="w-full max-w-[400px] mx-auto z-10">
+          <div className="text-center mb-8 mt-12 lg:mt-0">
+            <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold tracking-wide uppercase mb-5">
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Get Started Free
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">Create account</h2>
-            <p className="text-slate-500 mt-2">Sign up to get started</p>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">Create your account</h2>
+            <p className="text-slate-600 text-sm">Join us instantly using your social profile</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
-            <div className="lg:hidden text-center mb-8">
-              <SocialLogin type="register" />
-            </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10">
+            <SocialLogin type="register" />
 
-            <div className="hidden lg:block mb-6">
-              <h2 className="text-3xl font-bold text-slate-900">Create account</h2>
-              <p className="text-slate-500 mt-2">Sign up for free</p>
-            </div>
-
-            <div className="lg:hidden">
-              <SocialLogin type="register" />
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center space-y-4">
+              <div className="flex items-center text-xs text-slate-600 space-x-1.5 bg-slate-50 px-3 py-2 rounded-md border border-slate-200 w-full justify-center">
+                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                <span>We never post without your permission</span>
+              </div>
+              
+              <p className="text-sm text-slate-600">
+                Already have an account?{' '}
+                <a href="/login" className="text-cyan-600 font-semibold transition-colors">
+                  Sign in
+                </a>
+              </p>
             </div>
           </div>
         </div>
