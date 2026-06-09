@@ -64,7 +64,7 @@ export default function Dashboard({ documents, onSelectDoc, onDeleteDoc }: Dashb
   const userInitial = userName.charAt(0).toUpperCase();
 
   // Calculate stats
-  const totalPages = documents.reduce((sum, doc) => sum + doc.pageCount, 0);
+  const totalPages = documents.reduce((sum, doc) => sum + (doc.pageCount ?? 0), 0);
 
   const navItems: { id: ActiveView; label: string; icon: React.ReactNode }[] = [
     { id: 'documents', label: 'My Documents', icon: <FolderOpen size={18} /> },

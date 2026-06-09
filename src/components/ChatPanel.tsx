@@ -18,7 +18,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { PDFDocument, Message } from "@/types/chat";
+import { PDFDocument, Message, ChatAnswerResponse } from "@/types/chat";
 
 interface ChatPanelProps {
   doc: PDFDocument;
@@ -106,7 +106,7 @@ export default function ChatPanel({
         }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as ChatAnswerResponse;
 
       const botMsg: Message = {
         id: `assistant-${Date.now()}`,

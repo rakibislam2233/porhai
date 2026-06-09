@@ -7,10 +7,9 @@ import {
   WorkflowEvent,
 } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-const pdfjsLib = await import("pdfjs-dist");
 
 export class PorhaiWorkflow extends WorkflowEntrypoint<
-  Env,
+  CloudflareEnv,
   { documentId: string; userId: string }
 > {
   async run(
@@ -48,8 +47,9 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
 
     //Step 2: Process the PDF (e.g., extract text, generate embeddings, etc.)
     const extractedChunks = await step.do("extract-chunks", async () => {
+      const { getDocument } = await import("pdfjs-serverless");
       const uint8 = new Uint8Array(pdfBuffer.buffer);
-      const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+      const pdf = await getDocument({ data: uint8 }).promise;
       const allChunks: { content: string; pageNumber: number }[] = [];
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
@@ -84,6 +84,9 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
             text: chunk.content,
           },
         );
+        if (!("data" in embeddingResult) || !embeddingResult.data?.[0]) {
+          throw new Error("Failed to generate embedding");
+        }
         await db.insert(chunks).values({
           documentId,
           content: chunk.content,

@@ -1,5 +1,7 @@
-// @ts-ignore
-import worker from "./.open-next/worker";
+// @ts-ignore 
+import worker from "./.open-next/worker.js";
+export { ChatRoomDO } from "./src/durable-objects/chat-room";
+export { PorhaiWorkflow } from "./src/workflows/pdf-processor";
 
 export default {
   fetch: worker.fetch,

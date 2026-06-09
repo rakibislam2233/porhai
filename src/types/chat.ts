@@ -15,3 +15,12 @@ export interface Message {
   timestamp: string;
   sources?: number[];
 }
+
+export interface ChatAnswerResponse {
+  answer: string;
+  sources: number[];
+}
+
+export interface DocumentsResponse {
+  documents: PDFDocument[];
+}

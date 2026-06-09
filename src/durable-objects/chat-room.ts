@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import type { ChatAnswerResponse } from "@/types/chat";
 
 export class ChatRoomDO extends DurableObject {
   private history: { role: string; content: string }[] = [];
@@ -35,7 +36,7 @@ export class ChatRoomDO extends DurableObject {
         }), // Send only the last 6 messages to limit context size
       },
     );
-    const { answer, sources } = await res.json();
+    const { answer, sources } = (await res.json()) as ChatAnswerResponse;
     this.history.push({ role: "assistant", content: answer });
     ws.send(JSON.stringify({ answer, sources }));
   }

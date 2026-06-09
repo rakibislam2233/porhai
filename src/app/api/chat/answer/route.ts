@@ -3,25 +3,43 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
+type ChatAnswerRequest = {
+  question: string;
+  documentId: string;
+  history: { role: string; content: string };
+};
+
+type ChunkRow = {
+  content: string;
+  page_number: number;
+};
+
 export const POST = async (request: NextRequest) => {
   const { env } = await getCloudflareContext({ async: true });
-  
-  const { question, documentId, history } = await request.json();
+
+  const { question, documentId, history } =
+    (await request.json()) as ChatAnswerRequest;
   const db = getDb(env);
   const queryEmbedding = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
     text: question,
   });
-  const similaryChunks = await db.execute(sql`
+  if (!("data" in queryEmbedding) || !queryEmbedding.data?.[0]) {
+    return NextResponse.json(
+      { error: "Failed to generate embedding" },
+      { status: 500 },
+    );
+  }
+  const similarChunks = await db.execute(sql`
     SELECT content, page_number
     FROM chunks
     WHERE document_id = ${documentId}
     ORDER BY embedding <=> ${JSON.stringify(queryEmbedding.data[0])}::vector
     LIMIT 5
   `);
-  //Context
-  const context = similaryChunks.rows.map((c: any) => {
-    return `[Page ${c.page_number}]: ${c.content}`.join("\n\n");
-  });
+  const chunkRows = similarChunks as unknown as ChunkRow[];
+  const context = chunkRows
+    .map((c) => `[Page ${c.page_number}]: ${c.content}`)
+    .join("\n\n");
   const response = await env.AI.run(
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     {
@@ -36,9 +54,15 @@ export const POST = async (request: NextRequest) => {
       ],
     },
   );
-  const sources = similarChunks.rows.map((c: any) => c.page_number);
+  const sources = chunkRows.map((c) => c.page_number);
+  const answer =
+    typeof response === "string"
+      ? response
+      : "response" in response
+        ? response.response
+        : "";
   return NextResponse.json({
-    answer: response.response,
+    answer,
     sources: [...new Set(sources)],
   });
 };

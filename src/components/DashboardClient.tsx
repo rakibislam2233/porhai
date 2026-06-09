@@ -14,21 +14,24 @@ export default function DashboardClient() {
       name: 'AI_Agents_Architectural_Design_Patterns_2026.pdf',
       size: '2.4 MB',
       uploadedAt: 'Active session',
-      pageCount: 16
+      pageCount: 16,
+      status: 'completed',
     },
     {
       id: 'doc-2',
       name: 'Global_SaaS_User_Retention_Benchmark_Q2.pdf',
       size: '1.8 MB',
       uploadedAt: '3 hours ago',
-      pageCount: 24
+      pageCount: 24,
+      status: 'completed',
     },
     {
       id: 'doc-3',
       name: 'Vite_HMR_Latency_Under_Isolated_Containers.pdf',
       size: '954 KB',
       uploadedAt: '1 day ago',
-      pageCount: 10
+      pageCount: 10,
+      status: 'completed',
     }
   ]);
 
