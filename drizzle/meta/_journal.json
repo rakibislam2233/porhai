@@ -8,6 +8,27 @@
       "when": 1780984851315,
       "tag": "0000_reflective_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780988124083,
+      "tag": "0001_lyrical_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780991215979,
+      "tag": "0002_nervous_enchantress",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780997751247,
+      "tag": "0003_outgoing_gauntlet",
+      "breakpoints": true
     }
   ]
 }

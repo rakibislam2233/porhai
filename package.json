@@ -13,6 +13,8 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1064.0",
+    "@aws-sdk/s3-request-presigner": "^3.1064.0",
     "@hookform/resolvers": "^5.4.0",
     "@neondatabase/serverless": "^0.10.4",
     "@opennextjs/cloudflare": "^1.19.9",
@@ -25,7 +27,8 @@
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",
-    "next": "16.2.6",
+    "next": "^16.2.7",
+    "pdfjs-dist": "^6.0.227",
     "postgres": "^3.4.9",
     "react": "^19.1.7",
     "react-dom": "^19.1.7",

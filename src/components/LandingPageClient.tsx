@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { useUpload } from "@/hooks/useUpload";
 import {
   ArrowRight, FileText, Zap, Shield, Sparkles,
-  Upload, ShieldCheck, User, LogOut
+  Upload, ShieldCheck, User, LogOut, Loader2
 } from "lucide-react";
 
 export default function LandingPageClient() {
@@ -14,6 +15,12 @@ export default function LandingPageClient() {
   const { data: session } = authClient.useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // When upload is done, redirect to the chat page for the new document
+  const { upload, uploading, progress, error, reset } = useUpload((documentId) => {
+    router.push(`/chat/${documentId}`);
+  });
+
   const handleUploadClick = () => {
     if (!session) {
       router.push("/login");
@@ -26,7 +33,9 @@ export default function LandingPageClient() {
     e.preventDefault();
     setIsDragging(true);
   };
+
   const handleDragLeave = () => setIsDragging(false);
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -34,21 +43,34 @@ export default function LandingPageClient() {
       router.push("/login");
       return;
     }
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-        router.push(`/dashboard`);
-      }
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf"))) {
+      upload(file);
     }
   };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      router.push(`/dashboard`);
+    const file = e.target.files?.[0];
+    if (file) {
+      upload(file);
     }
+    // Reset input so same file can be re-selected if needed
+    e.target.value = "";
   };
 
   const handleSignOut = async () => {
     await authClient.signOut();
+  };
+
+  // Determine the upload zone label based on current state
+  const getUploadLabel = () => {
+    if (uploading) {
+      if (progress < 30) return "Starting upload...";
+      if (progress < 80) return "Uploading to storage...";
+      return "Processing document...";
+    }
+    if (isDragging) return "Drop your PDF here";
+    return "Upload your PDF to begin";
   };
 
   return (
@@ -124,7 +146,8 @@ export default function LandingPageClient() {
             transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
             className="text-base md:text-lg text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            Upload any document, report, or book. Our advanced AI instantly reads, understands, and answers any question you have about your files.
+            Upload any document, report, or book. Our advanced AI instantly reads, understands,
+            and answers any question you have about your files.
           </motion.p>
 
           <motion.div
@@ -156,15 +179,17 @@ export default function LandingPageClient() {
             className="max-w-3xl mx-auto"
           >
             <div
-              className={`relative rounded-2xl cursor-pointer transition-all duration-200 bg-white ${
-                isDragging
-                  ? "border-2 border-dashed border-cyan-600 bg-cyan-50"
-                  : "border-2 border-dashed border-slate-300"
+              className={`relative rounded-2xl transition-all duration-200 bg-white ${
+                uploading
+                  ? "border-2 border-dashed border-cyan-400 cursor-not-allowed"
+                  : isDragging
+                  ? "border-2 border-dashed border-cyan-600 bg-cyan-50 cursor-copy"
+                  : "border-2 border-dashed border-slate-300 cursor-pointer"
               }`}
-              onClick={handleUploadClick}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onClick={!uploading ? handleUploadClick : undefined}
+              onDragOver={!uploading ? handleDragOver : undefined}
+              onDragLeave={!uploading ? handleDragLeave : undefined}
+              onDrop={!uploading ? handleDrop : undefined}
             >
               <input
                 type="file"
@@ -172,24 +197,74 @@ export default function LandingPageClient() {
                 className="hidden"
                 accept=".pdf,application/pdf"
                 onChange={handleFileChange}
+                disabled={uploading}
               />
+
               <div className="py-16 px-6 sm:px-12 text-center flex flex-col items-center justify-center">
+                {/* Icon: spinner while uploading, upload icon otherwise */}
                 <div className="w-16 h-16 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center mb-6">
-                  <Upload size={28} className="text-cyan-600" />
+                  {uploading ? (
+                    <Loader2 size={28} className="text-cyan-600 animate-spin" />
+                  ) : (
+                    <Upload size={28} className="text-cyan-600" />
+                  )}
                 </div>
+
                 <h3 className="text-xl font-bold text-slate-900 mb-2">
-                  {isDragging ? "Drop your PDF here" : "Upload your PDF to begin"}
+                  {getUploadLabel()}
                 </h3>
+
                 <p className="text-slate-600 text-sm mb-6">
-                  {session
-                    ? <>Drag and drop your file, or <span className="text-cyan-600 font-semibold">browse your computer</span>.</>
-                    : <>Sign in first to upload and chat with your PDFs.</>
-                  }
+                  {uploading ? (
+                    <span className="text-cyan-600 font-medium">
+                      Please wait, do not close this tab...
+                    </span>
+                  ) : session ? (
+                    <>
+                      Drag and drop your file, or{" "}
+                      <span className="text-cyan-600 font-semibold">browse your computer</span>.
+                    </>
+                  ) : (
+                    <>Sign in first to upload and chat with your PDFs.</>
+                  )}
                 </p>
+
+                {/* Progress bar — only visible while uploading */}
+                {uploading && (
+                  <div className="w-full max-w-xs mx-auto mb-4">
+                    <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-cyan-600 rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1.5">{progress}%</p>
+                  </div>
+                )}
+
+                {/* Error message with retry option */}
+                {error && (
+                  <div className="mb-4 flex items-center space-x-2">
+                    <p className="text-sm text-red-500">{error}</p>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); reset(); }}
+                      className="text-xs text-cyan-600 underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-slate-500 bg-slate-50 py-2.5 px-5 rounded-lg border border-slate-200">
-                  <span className="flex items-center space-x-1.5"><ShieldCheck size={14} className="text-cyan-600" /><span>Secure & Private</span></span>
+                  <span className="flex items-center space-x-1.5">
+                    <ShieldCheck size={14} className="text-cyan-600" />
+                    <span>Secure & Private</span>
+                  </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                  <span className="flex items-center space-x-1.5"><Zap size={14} className="text-cyan-600" /><span>Instant Analysis</span></span>
+                  <span className="flex items-center space-x-1.5">
+                    <Zap size={14} className="text-cyan-600" />
+                    <span>Instant Analysis</span>
+                  </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-300 hidden sm:block" />
                   <span className="hidden sm:block">Up to 50MB</span>
                 </div>

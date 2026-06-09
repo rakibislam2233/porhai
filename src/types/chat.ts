@@ -3,12 +3,15 @@ export interface PDFDocument {
   name: string;
   size: string;
   uploadedAt: string;
-  pageCount: number;
+  pageCount: number | null;
+  status: "uploading" | "processing" | "completed" | "failed";
+  b2Url?: string;
 }
 
 export interface Message {
   id: string;
-  sender: 'user' | 'assistant';
+  sender: "user" | "assistant";
   text: string;
   timestamp: string;
+  sources?: number[];
 }
