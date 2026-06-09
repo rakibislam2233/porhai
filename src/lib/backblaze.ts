@@ -52,7 +52,7 @@ const setupBucketCORS = async () => {
 
 const uploadFileToBackblaze = async (
   key: string,
-  body: ArrayBuffer | Uint8Array,
+  body: ArrayBuffer,
   contentType: string,
 ) => {
   const bucket = process.env.B2_BUCKET_NAME;
@@ -61,11 +61,10 @@ const uploadFileToBackblaze = async (
   }
 
   const uploadUrl = await getUploadPresignedUrl(key, contentType);
-  const payload = body instanceof Uint8Array ? body : new Uint8Array(body);
 
   const response = await fetch(uploadUrl, {
     method: "PUT",
-    body: new Blob([payload], { type: contentType }),
+    body,
     headers: { "Content-Type": contentType },
   });
 
