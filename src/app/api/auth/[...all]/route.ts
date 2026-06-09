@@ -1,4 +1,13 @@
-import { auth } from "@/lib/auth";
-import { toNextJsHandler } from "better-auth/next-js";
+import { getAuth } from "@/lib/auth";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+export async function GET(request: Request) {
+  const { env } = await getCloudflareContext({ async: true });
+  const auth = getAuth(env);
+  return auth.handler(request);
+}
 
-export const { GET, POST } = toNextJsHandler(auth);
+export async function POST(request: Request) {
+  const { env } = await getCloudflareContext({ async: true });
+  const auth = getAuth(env);
+  return auth.handler(request);
+}

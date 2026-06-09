@@ -1,49 +1,91 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "chat-with-pdf",
-	"main": ".open-next/worker.js",
-	"compatibility_date": "2026-06-08",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"assets": {
-		"binding": "ASSETS",
-		"directory": ".open-next/assets"
-	},
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	},
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "chat-with-pdf"
-		}
-	],
-	"observability": {
-		"enabled": true
-	},
-	"upload_source_maps": true
-	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": {  "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "porhai",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-08",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets",
+  },
+  "images": {
+    "binding": "IMAGES",
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "porhai",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "upload_source_maps": true,
+
+  // 1. Configure Hyperdrive for decentralized storage
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "19ad010c64dc4b849feef5f674d06f6d",
+      "localConnectionString": "postgresql://neondb_owner:npg_eCRnO5Li2vUY@ep-dawn-queen-ao35phwy-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+    },
+  ],
+
+  // 2. Configure queues for background processing
+  "queues": {
+    "producers": [
+      {
+        "queue": "porhai-queue",
+        "binding": "QUEUE",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "porhai-queue",
+        "max_batch_size": 10,
+        "max_retries": 5,
+      },
+    ],
+  },
+
+  // 3. Configure KV namespaces for key-value storage
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "82b5a7209be6489590576c6c4d3e77d2",
+      "remote": true,
+    },
+  ],
+
+  // 4. Configure Workflows for orchestrating complex tasks
+  "workflows": [
+    {
+      "name": "porhai-workflow",
+      "binding": "WORKFLOWS",
+      "class_name": "PorhaiWorkflow",
+    },
+  ],
+
+  // 5. Configure Durable Objects for real-time chat state management
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_ROOM_DO",
+        "class_name": "ChatRoomDO",
+      },
+    ],
+  },
+
+  // 6. Migrations for Durable Objects
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["ChatRoomDO"],
+    },
+  ],
+
+  // 7. Configure Workers AI for PDF Embeddings and LLM Chat
+  "ai": {
+    "binding": "AI",
+  },
 }

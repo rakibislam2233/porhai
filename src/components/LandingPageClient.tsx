@@ -1,5 +1,4 @@
 "use client";
-
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,7 +14,6 @@ export default function LandingPageClient() {
   const { data: session } = authClient.useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-
   const handleUploadClick = () => {
     if (!session) {
       router.push("/login");

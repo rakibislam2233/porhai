@@ -1,5 +1,4 @@
 "use client";
-
 import { authClient } from "@/lib/auth-client";
 import { useState } from "react";
 import { motion } from "motion/react";
@@ -12,7 +11,7 @@ export function SocialLogin({ type = "login" }: { type?: "login" | "register" })
     try {
       await authClient.signIn.social({
         provider: provider,
-        callbackURL: "/dashboard",
+        callbackURL: "/",
       });
     } catch (error) {
       console.error(error);
@@ -28,7 +27,7 @@ export function SocialLogin({ type = "login" }: { type?: "login" | "register" })
         whileTap={{ scale: 0.98 }}
         onClick={() => handleSignIn("google")}
         disabled={isLoading !== null}
-        className="w-full flex items-center justify-center space-x-3 py-3 px-4 border border-slate-300 rounded-lg bg-white text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full cursor-pointer flex items-center justify-center space-x-3 py-3 px-4 border border-slate-300 rounded-lg bg-white text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isLoading === "google" ? (
           <div className="w-5 h-5 border-2 border-slate-200 border-t-cyan-600 rounded-full animate-spin" />
@@ -62,7 +61,7 @@ export function SocialLogin({ type = "login" }: { type?: "login" | "register" })
         whileTap={{ scale: 0.98 }}
         onClick={() => handleSignIn("github")}
         disabled={isLoading !== null}
-        className="w-full flex items-center justify-center space-x-3 py-3 px-4 bg-slate-900 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full cursor-pointer flex items-center justify-center space-x-3 py-3 px-4 bg-slate-900 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isLoading === "github" ? (
           <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
