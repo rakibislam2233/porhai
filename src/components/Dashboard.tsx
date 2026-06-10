@@ -1,17 +1,33 @@
 "use client";
 
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import {
-  FileText, Calendar, Layers, Search,
-  Trash2, BookOpen, ChevronRight, User,
-  Home, FolderOpen, Settings, LogOut, Menu, X,
-  Mail, Camera, Shield, AlertTriangle,
-  BarChart3, Clock, MessageSquare, HardDrive
-} from 'lucide-react';
-import Link from 'next/link';
 import { authClient } from '@/lib/auth-client';
 import { PDFDocument } from '@/types/chat';
+import {
+  AlertTriangle,
+  BookOpen,
+  Calendar,
+  Camera,
+  ChevronRight,
+  Clock,
+  FileText,
+  FolderOpen,
+  HardDrive,
+  Home,
+  Layers,
+  LogOut,
+  Mail,
+  Menu,
+  MessageSquare,
+  Search,
+  Settings,
+  Shield,
+  Trash2,
+  User,
+  X
+} from 'lucide-react';
+import { motion } from 'motion/react';
+import Link from 'next/link';
+import React, { useState } from 'react';
 
 type ActiveView = 'documents' | 'profile' | 'settings';
 
@@ -221,7 +237,7 @@ export default function Dashboard({ documents, onSelectDoc, onDeleteDoc }: Dashb
                         <span className="text-slate-700 flex-1 truncate">
                           Uploaded <span className="font-semibold text-slate-900">{doc.name}</span>
                         </span>
-                        <span className="text-xs text-slate-400 flex-shrink-0">{doc.uploadedAt}</span>
+                        <span className="text-xs text-slate-400 flex-shrink-0">{doc.createdAt}</span>
                       </div>
                     ))}
                   </div>
@@ -260,7 +276,7 @@ export default function Dashboard({ documents, onSelectDoc, onDeleteDoc }: Dashb
                         <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-xs font-medium text-slate-600 bg-slate-50 rounded-lg p-2.5 border border-slate-100">
                           <div className="flex items-center space-x-1.5"><Layers size={14} className="text-slate-400" /><span>{doc.pageCount} Pages</span></div>
                           <div className="flex items-center space-x-1.5"><BookOpen size={14} className="text-slate-400" /><span>{doc.size}</span></div>
-                          <div className="col-span-2 flex items-center space-x-1.5 pt-1.5 mt-0.5 border-t border-slate-200 text-slate-500"><Calendar size={12} className="text-slate-400" /><span>{doc.uploadedAt}</span></div>
+                          <div className="col-span-2 flex items-center space-x-1.5 pt-1.5 mt-0.5 border-t border-slate-200 text-slate-500"><Calendar size={12} className="text-slate-400" /><span>{doc.createdAt}</span></div>
                         </div>
                       </div>
                       <button onClick={() => onSelectDoc(doc)} className="w-full bg-slate-50 border-t border-slate-200 text-cyan-700 font-bold text-sm py-3 flex items-center justify-center space-x-1.5">
