@@ -1,8 +1,6 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { Message, ChatSessionResponse } from "@/types/chat";
-
 export function useChatSession(documentId: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
@@ -35,8 +33,8 @@ export function useChatSession(documentId: string) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ documentId }),
           });
-          const createData = await createRes.json();
-          setSessionId(createData.session.id);
+          const createData: ChatSessionResponse = await createRes.json();
+          setSessionId(createData.session?.id ?? null);
           setInitialMessages([]);
         }
       } catch (error) {
