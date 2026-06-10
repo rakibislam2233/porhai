@@ -1,4 +1,3 @@
-import { getReadPresignedUrl } from "@/lib/backblaze";
 import { getDb } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
 import {
@@ -7,6 +6,8 @@ import {
   WorkflowEvent,
 } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
+import { promises as fs } from "fs";
+import path from "path";
 
 export class PorhaiWorkflow extends WorkflowEntrypoint<
   CloudflareEnv,
@@ -19,62 +20,63 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
     const { documentId } = event.payload;
     const db = getDb(this.env);
 
-    // Step 1: Fetch the document details Backblaze
-    const pdfBuffer = await step.do("fetch-pdf", async () => {
+    // Step 1: Fetch the document details & read file locally
+    const pdfBufferData = await step.do("fetch-pdf", async () => {
       const doc = await db.query.documents.findFirst({
         where: eq(documents.id, documentId),
       });
       if (!doc) {
         throw new Error("Document not found");
       }
-      //Backblaze to presigned url and fetch the PDF as buffer
-      const url = await getReadPresignedUrl(doc.b2Key, this.env);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Failed to fetch PDF from Backblaze");
-      }
-      const buffer = await response.arrayBuffer();
+
+      // Node environment path integration
+      const absoluteFilePath = path.join(process.cwd(), "public", doc.b2Url);
+      const fileBuffer = await fs.readFile(absoluteFilePath);
+
       return {
-        buffer: Array.from(new Uint8Array(buffer)),
+        buffer: Array.from(new Uint8Array(fileBuffer)),
         b2Key: doc.b2Key,
       };
     });
 
-    if (!pdfBuffer) {
-      throw new Error("Failed to fetch PDF from Backblaze");
+    if (!pdfBufferData) {
+      throw new Error("Failed to read local PDF file data");
     }
 
-    //Step 2: Process the PDF (e.g., extract text, generate embeddings, etc.)
+    // Step 2: Process the PDF (Text Extraction logic fixed)
     const extractedChunks = await step.do("extract-chunks", async () => {
       const { getDocument } = await import("pdfjs-serverless");
-      const uint8 = new Uint8Array(pdfBuffer.buffer);
+      const uint8 = new Uint8Array(pdfBufferData.buffer);
       const pdf = await getDocument({ data: uint8 }).promise;
       const allChunks: { content: string; pageNumber: number }[] = [];
+
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
           .map((item: any) => item.str)
           .join(" ");
-        if (!pageText) continue;
 
-        const words = pageText.split(" ");
+        if (!pageText.trim()) continue;
+
+        const words = pageText.split(/\s+/); // Better whitespace split
         let chunk = "";
+
         for (const word of words) {
           chunk += word + " ";
           if (chunk.length > 1000) {
-            allChunks.push({ content: chunk, pageNumber: pageNum });
+            allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
             chunk = "";
           }
-          if (chunk.trim()) {
-            allChunks.push({ content: chunk, pageNumber: pageNum });
-          }
+        }
+        if (chunk.trim()) {
+          allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
         }
       }
       return allChunks;
     });
 
-    //Step 3: Save the extracted chunks back to the database
+    // Step 3: Save the extracted chunks back to the database
     await step.do("embed-and-save", async () => {
       for (const chunk of extractedChunks) {
         const embeddingResult = await this.env.AI.run(
@@ -83,9 +85,11 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
             text: chunk.content,
           },
         );
+
         if (!("data" in embeddingResult) || !embeddingResult.data?.[0]) {
           throw new Error("Failed to generate embedding");
         }
+
         await db.insert(chunks).values({
           documentId,
           content: chunk.content,
@@ -95,16 +99,18 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
       }
     });
 
-    //Step 4: Update the document status in the database
+    // Step 4: Update the document status in the database & KV
     await step.do("update-document-status", async () => {
       await db
         .update(documents)
         .set({ status: "completed" })
         .where(eq(documents.id, documentId));
-    });
 
-    await this.env.KV.put(`doc:status:${documentId}`, "completed", {
-      expirationTtl: 3600,
+      if (this.env.KV) {
+        await this.env.KV.put(`doc:status:${documentId}`, "completed", {
+          expirationTtl: 3600,
+        });
+      }
     });
   }
 }

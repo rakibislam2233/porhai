@@ -1,16 +1,16 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-function getDevEnv(): CloudflareEnv {
-  return process.env as unknown as CloudflareEnv;
-}
-
 export async function getEnv(): Promise<CloudflareEnv> {
-  if (process.env.NODE_ENV === "development") {
-    return getDevEnv();
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    return env as unknown as CloudflareEnv;
+  } catch (error) {
+    console.warn(
+      "⚠️ Failed to get Cloudflare context, falling back to process.env",
+      error,
+    );
+    return process.env as unknown as CloudflareEnv;
   }
-
-  const { env } = await getCloudflareContext({ async: true });
-  return env;
 }
 
 export function isDevRuntime() {

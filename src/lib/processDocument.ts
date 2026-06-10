@@ -1,29 +1,30 @@
 import { getDb } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { chunks, documents } from "./db/schema";
-import { getReadPresignedUrl } from "./backblaze";
-
+import { promises as fs } from "fs";
+import path from "path";
 const { getDocument: getPdfDocument } = await import("pdfjs-serverless");
-
 export async function processDocument(env: CloudflareEnv, documentId: string) {
   console.log(
-    "============================ Starting to process document =============================",
+    "============================ Starting to process document locally =============================",
   );
   const db = getDb(env);
   try {
-    // Step 1: Fetch PDF from Backblaze
+    // Step 1: Fetch Document details from Database
     const doc = await db.query.documents.findFirst({
       where: eq(documents.id, documentId),
     });
 
     if (!doc) throw new Error("Document not found");
+    console.log(`📂 Reading local file from path: ${doc.b2Url}`);
+    const absoluteFilePath = path.join(process.cwd(), "public", doc.b2Url);
+    const fileBuffer = await fs.readFile(absoluteFilePath);
 
-    const url = await getReadPresignedUrl(doc.b2Key, env);
-    const response = await fetch(url);
-
-    if (!response.ok) throw new Error("Failed to fetch PDF from Backblaze");
-
-    const buffer = await response.arrayBuffer();
+    // ArrayBuffer components setup
+    const buffer = fileBuffer.buffer.slice(
+      fileBuffer.byteOffset,
+      fileBuffer.byteOffset + fileBuffer.byteLength,
+    );
     const uint8 = new Uint8Array(buffer);
 
     // Step 2: Extract chunks
