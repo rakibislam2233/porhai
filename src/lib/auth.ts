@@ -3,8 +3,12 @@ import { users, accounts, sessions, verifications } from "@/lib/db/schema";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
-export function getAuth(env: any) {
+export function getAuth(env: CloudflareEnv, requestUrl?: string) {
   const db = getDb(env);
+  const baseURL =
+    (env as any).NEXT_PUBLIC_APP_URL ||
+    (requestUrl ? new URL(requestUrl).origin : "http://localhost:3000");
+
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -16,7 +20,7 @@ export function getAuth(env: any) {
       },
       usePlural: true,
     }),
-    baseURL: env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL!,
+    baseURL: baseURL,
     secret: env.BETTER_AUTH_SECRET || process.env.BETTER_AUTH_SECRET!,
     // ✅ Social Providers
     socialProviders: {

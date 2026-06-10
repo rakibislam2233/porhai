@@ -4,6 +4,10 @@
   "main": "worker.ts",
   "compatibility_date": "2026-06-08",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "build": {
+    "command": "npm run build",
+    "watch_dir": "src",
+  },
   "assets": {
     "binding": "ASSETS",
     "directory": ".open-next/assets",
@@ -22,7 +26,6 @@
   },
   "upload_source_maps": true,
   "minify": true,
-
   // 1. Configure Hyperdrive for decentralized storage
   "hyperdrive": [
     {
@@ -48,7 +51,6 @@
       },
     ],
   },
-
   // 3. Configure KV namespaces for key-value storage
   "kv_namespaces": [
     {
@@ -65,7 +67,6 @@
       "class_name": "PorhaiWorkflow",
     },
   ],
-
   // 5. Configure Durable Objects for real-time chat state management
   "durable_objects": {
     "bindings": [

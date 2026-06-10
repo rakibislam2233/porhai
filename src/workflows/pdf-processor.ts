@@ -6,8 +6,7 @@ import {
   WorkflowEvent,
 } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-import { promises as fs } from "fs";
-import path from "path";
+import { env } from "process";
 
 export class PorhaiWorkflow extends WorkflowEntrypoint<
   CloudflareEnv,
@@ -20,18 +19,21 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
     const { documentId } = event.payload;
     const db = getDb(this.env);
 
-    // Step 1: Fetch the document details & read file locally
+    // 🛠️ Step 1 Replacement Blueprint (No fs / No path dependency)
     const pdfBufferData = await step.do("fetch-pdf", async () => {
       const doc = await db.query.documents.findFirst({
         where: eq(documents.id, documentId),
       });
-      if (!doc) {
-        throw new Error("Document not found");
-      }
+      if (!doc) throw new Error("Document not found");
+      const targetUrl = doc.b2Url.startsWith("http")
+        ? doc.b2Url
+        : `${env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL}/${doc.b2Url}`;
 
-      // Node environment path integration
-      const absoluteFilePath = path.join(process.cwd(), "public", doc.b2Url);
-      const fileBuffer = await fs.readFile(absoluteFilePath);
+      const response = await fetch(targetUrl);
+      if (!response.ok)
+        throw new Error("Failed to fetch PDF payload from storage network");
+
+      const fileBuffer = await response.arrayBuffer();
 
       return {
         buffer: Array.from(new Uint8Array(fileBuffer)),

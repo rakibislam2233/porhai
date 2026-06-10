@@ -1,8 +1,7 @@
-// @ts-ignore `.open-next/worker.js` is generated at build time
+// @ts-ignore
 import openNextWorker from "./.open-next/worker.js";
-export { ChatRoomDO } from "./src/durable-objects/chat-room";
+export { ChatRoomDO } from "./src/durable-objects/chat-room"; 
 export { PorhaiWorkflow } from "./src/workflows/pdf-processor";
-const START_PROCESSING_PATH = "/__porhai/process-document";
 
 export default {
   fetch: async (
@@ -12,14 +11,18 @@ export default {
   ) => {
     return openNextWorker.fetch(request, env, ctx);
   },
+
   async queue(
     batch: MessageBatch<{ type: string; documentId: string; userId: string }>,
     env: CloudflareEnv,
+    ctx: ExecutionContext,
   ) {
     for (const msg of batch.messages) {
       try {
         const { type, documentId, userId } = msg.body;
+
         if (type === "Process_Document") {
+          // 🚀 Cloudflare Workflows Trigger Rule (using .create with strict naming options)
           await env.WORKFLOWS.create({
             id: `pdf-processing-${documentId}-${Date.now()}`,
             params: { documentId, userId },
@@ -27,7 +30,7 @@ export default {
           msg.ack();
         }
       } catch (error) {
-        console.error("Queue processing failed:", error);
+        console.error("🔴 Queue processing failed:", error);
         msg.retry();
       }
     }
