@@ -7,7 +7,7 @@ import { getAuth } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const env = await getEnv();
-  const session = await getAuth(env).api.getSession({
+  const session = await getAuth(env, req.url).api.getSession({
     headers: req.headers,
   });
   if (!session) {

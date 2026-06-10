@@ -20,7 +20,7 @@ type ChunkRow = {
 export const POST = async (request: NextRequest) => {
   try {
     const env = await getEnv();
-    const session = await getAuth(env).api.getSession({
+    const session = await getAuth(env, request.url).api.getSession({
       headers: request.headers,
     });
     if (!session) {
@@ -39,7 +39,7 @@ export const POST = async (request: NextRequest) => {
 
     const db = getDb(env);
 
-    // Step 1: Question emabedding 
+    // Step 1: Question emabedding
     const queryEmbedding = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
       text: question,
     });
@@ -104,7 +104,7 @@ ${context}`,
 
     const sources = [...new Set(chunkRows.map((c) => c.page_number))];
 
-    // Step 4: Message database এ question + answer + sources save 
+    // Step 4: Message database এ question + answer + sources save
     await db.insert(chatMessages).values([
       {
         sessionId,

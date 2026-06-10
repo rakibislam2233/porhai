@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const GET = async (request: NextRequest) => {
   try {
     const env = await getEnv();
-    const session = await getAuth(env).api.getSession({
+    const session = await getAuth(env, request.url).api.getSession({
       headers: request.headers,
     });
     if (!session) {
@@ -47,7 +47,7 @@ export const GET = async (request: NextRequest) => {
 export const POST = async (request: NextRequest) => {
   try {
     const env = await getEnv();
-    const session = await getAuth(env).api.getSession({
+    const session = await getAuth(env, request.url).api.getSession({
       headers: request.headers,
     });
     if (!session) {

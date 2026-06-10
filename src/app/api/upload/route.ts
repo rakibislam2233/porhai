@@ -11,7 +11,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const POST = async (request: NextRequest) => {
   try {
     const env = await getEnv();
-    const session = await getAuth(env).api.getSession({
+    const session = await getAuth(env, request.url).api.getSession({
       headers: request.headers,
     });
     if (!session) {
