@@ -2,9 +2,9 @@ import { getAuth } from "@/lib/auth";
 import { uploadFileToBackblaze } from "@/lib/backblaze";
 import { getDb } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
-import { startDocumentProcessing } from "@/lib/process-document";
 import { getEnv } from "@/lib/cf-env";
 import { NextRequest, NextResponse } from "next/server";
+import { processDocument } from "@/lib/processDocument";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -22,7 +22,10 @@ export const POST = async (request: NextRequest) => {
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "PDF file is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "PDF file is required" },
+        { status: 400 },
+      );
     }
 
     if (
@@ -59,8 +62,22 @@ export const POST = async (request: NextRequest) => {
         status: "processing",
       })
       .returning();
+    // In development, we can process the document immediately for faster feedback
+    if (process.env.NODE_ENV === "development") {
+      await processDocument(env, doc.id);
+    } else {
+      // Mark the document as processing in KV so that the frontend can show the correct status
+      await env.KV?.put(`doc:status:${doc.id}`, "processing", {
+        expirationTtl: 3600,
+      });
 
-    await startDocumentProcessing(env, doc.id, session.user.id);
+      // Enqueue a message to process the document asynchronously
+      await env.QUEUE.send({
+        type: "Process_Document",
+        documentId: doc.id,
+        userId: session.user.id,
+      });
+    }
 
     return NextResponse.json({ documentId: doc.id });
   } catch (error) {

@@ -1,26 +1,38 @@
-export interface PDFDocument {
+export type PDFDocument = {
   id: string;
   name: string;
   size: string;
-  uploadedAt: string;
-  pageCount: number | null;
+  pageCount: number;
   status: "uploading" | "processing" | "completed" | "failed";
-  b2Url?: string;
-}
+  createdAt: string;
+};
 
-export interface Message {
+export type Message = {
   id: string;
   sender: "user" | "assistant";
   text: string;
-  timestamp: string;
   sources?: number[];
-}
+  timestamp: string;
+};
 
-export interface ChatAnswerResponse {
+export type ChatAnswerResponse = {
   answer: string;
   sources: number[];
-}
+};
 
-export interface DocumentsResponse {
+export type DocumentsResponse = {
   documents: PDFDocument[];
-}
+};
+
+export type ChatSessionResponse = {
+  session: {
+    id: string;
+    messages: {
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      sources: number[] | null;
+      createdAt: string;
+    }[];
+  } | null;
+};

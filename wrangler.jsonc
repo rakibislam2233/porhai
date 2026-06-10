@@ -21,6 +21,7 @@
     "enabled": true,
   },
   "upload_source_maps": true,
+  "minify": true,
 
   // 1. Configure Hyperdrive for decentralized storage
   "hyperdrive": [

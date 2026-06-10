@@ -38,7 +38,6 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
         buffer: Array.from(new Uint8Array(buffer)),
         b2Key: doc.b2Key,
       };
-      return;
     });
 
     if (!pdfBuffer) {

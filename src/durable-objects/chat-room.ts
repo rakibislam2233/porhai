@@ -21,19 +21,22 @@ export class ChatRoomDO extends DurableObject {
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
     const { question, documentId } = JSON.parse(message.toString());
     this.history.push({ role: "user", content: question });
-
+    
+    // Limit the history to the last 20 messages
+    if (this.history.length > 20) {
+      this.history = this.history.slice(-20);
+    }
     // Simulate a response from the assistant (replace with actual logic)
     const res = await fetch(
       `${this.env.WORKER_SELF_REFERENCE}/api/chat/answer`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // body: JSON.stringify({ question, documentId, history: this.history }),
         body: JSON.stringify({
           question,
           documentId,
           history: this.history.slice(-6),
-        }), // Send only the last 6 messages to limit context size
+        }),
       },
     );
     const { answer, sources } = (await res.json()) as ChatAnswerResponse;

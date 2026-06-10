@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index";
-import * as schema from "@/lib/db/schema";
+import { users, accounts, sessions, verifications } from "@/lib/db/schema";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
@@ -9,10 +9,10 @@ export function getAuth(env: any) {
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
-        users: schema.users,
-        sessions: schema.sessions,
-        accounts: schema.accounts,
-        verifications: schema.verifications,
+        users: users,
+        sessions: sessions,
+        accounts: accounts,
+        verifications: verifications,
       },
       usePlural: true,
     }),

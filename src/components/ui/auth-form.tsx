@@ -9,7 +9,7 @@ import { Label } from './label'
 import { Form, FormItem, FormMessage } from './form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import * as z from 'zod'
+import { z } from 'zod';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),

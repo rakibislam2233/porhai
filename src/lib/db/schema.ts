@@ -59,8 +59,6 @@ export const verifications = pgTable("verification", {
   updatedAt: timestamp("updatedAt").notNull(),
 });
 
-// কেন text + $type: pgEnum DB-তে আগে create হতে হয়
-// text দিলে সেই ঝামেলা নেই, TypeScript-এ type safety পাবে $type দিয়ে
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id")
@@ -88,6 +86,27 @@ export const chunks = pgTable("chunks", {
   embedding: vector("embedding", { dimensions: 768 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
+export const chatSessions = pgTable("chat_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => chatSessions.id, { onDelete: "cascade" }),
+  role: text("role").$type<"user" | "assistant">().notNull(),
+  content: text("content").notNull(),
+  sources: integer("sources").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
@@ -110,7 +129,31 @@ export const chunksRelations = relations(chunks, ({ one }) => ({
   }),
 }));
 
+export const chatSessionsRelations = relations(
+  chatSessions,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [chatSessions.userId],
+      references: [users.id],
+    }),
+    document: one(documents, {
+      fields: [chatSessions.documentId],
+      references: [documents.id],
+    }),
+    messages: many(chatMessages),
+  }),
+);
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  session: one(chatSessions, {
+    fields: [chatMessages.sessionId],
+    references: [chatSessions.id],
+  }),
+}));
+
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
 export type NewUser = typeof users.$inferInsert;
 export type NewChunk = typeof chunks.$inferInsert;
+export type NewChatSession = typeof chatSessions.$inferInsert;
+export type NewChatMessage = typeof chatMessages.$inferInsert;

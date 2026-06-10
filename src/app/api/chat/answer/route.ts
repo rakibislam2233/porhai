@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 type ChatAnswerRequest = {
   question: string;
   documentId: string;
-  history: { role: string; content: string };
+  history: { role: string; content: string }[];
 };
 
 type ChunkRow = {
@@ -46,11 +46,20 @@ export const POST = async (request: NextRequest) => {
       messages: [
         {
           role: "system",
-          content: `You are a helpful assistant. Answer questions based ONLY on the provided document context. If the answer is not in the context, say "I'm sorry, but I don't know the answer to that question." Always mention the page number when referencing content. Context: ${context}`,
+          content: `You are a helpful assistant for document Q&A.
+          CRITICAL LANGUAGE RULE:
+          - Detect the language of the user's question
+          - If the question is in Bengali (Bangla script like আমি, কী, কেন), reply in Bengali
+          - If the question is in Banglish (Bengali written in English letters like "ki ache", "keno holo"), reply in Banglish
+          - If the question is in English, reply in English
+          - Always match the user's language exactly. Never switch languages.
+
+          Answer questions based ONLY on the provided document context.
+          If the answer is not in the context, say so in the same language as the question.
+          Always mention page numbers when referencing content.
+          Context: ${context}`,
         },
-        {
-          ...history,
-        },
+        ...history,
       ],
     },
   );
