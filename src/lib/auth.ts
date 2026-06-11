@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index";
-import { users, accounts, sessions, verifications } from "@/lib/db/schema";
+import { accounts, sessions, users, verifications } from "@/lib/db/schema";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 

@@ -1,10 +1,10 @@
 import { getAuth } from "@/lib/auth";
+import { getEnv } from "@/lib/cf-env";
 import { getDb } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
-import { getEnv } from "@/lib/cf-env";
-import { NextRequest, NextResponse } from "next/server";
 import { processDocument } from "@/lib/processDocument";
-import { saveFileLocally } from "@/lib/saveFileLocally";
+import { getSupabse } from "@/lib/supabase";
+import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -47,12 +47,23 @@ export const POST = async (request: NextRequest) => {
 
     // Relative Key dynamic tracking
     const key = `pdfs/${session.user.id}/${Date.now()}-${file.name}`;
-    const buffer = await file.arrayBuffer();
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const supabase = getSupabse(env);
 
-    // 🚀 SAVING LOCALLY INSTEAD OF BACKBLAZE
-    console.log("📂 Saving file locally to public folder...");
-    const fileUrl = await saveFileLocally(key, buffer);
-    console.log("✅ Saved! Local Path/URL:", fileUrl);
+    const { data, error } = await supabase.storage
+      .from(env.SUPABASE_BUCKET_NAME)
+      .upload(key, buffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(env.SUPABASE_BUCKET_NAME).getPublicUrl(data.path);
 
     const db = getDb(env);
     const [doc] = await db
@@ -61,8 +72,7 @@ export const POST = async (request: NextRequest) => {
         userId: session.user.id,
         fileName: file.name,
         fileSize: file.size,
-        b2Key: key,
-        b2Url: fileUrl,
+        fileUrl: publicUrl,
         status: "processing",
       })
       .returning();
@@ -82,12 +92,11 @@ export const POST = async (request: NextRequest) => {
         });
       }
     }
-
-    return NextResponse.json({ documentId: doc.id, url: fileUrl });
+    return NextResponse.json({ documentId: doc.id, url: publicUrl });
   } catch (error) {
-    console.error("Local Upload failed:", error);
+    console.error("File Upload failed:", error);
     return NextResponse.json(
-      { error: "Failed to save file locally" },
+      { error: "Failed to upload file" },
       { status: 500 },
     );
   }

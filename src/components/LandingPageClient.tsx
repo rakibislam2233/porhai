@@ -1,15 +1,22 @@
 "use client";
+import { Logo } from "@/components/Logo";
+import { useUpload } from "@/hooks/useUpload";
+import { authClient } from "@/lib/auth-client";
+import {
+  ArrowRight,
+  Loader2,
+  LogOut,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  User,
+  Zap
+} from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { authClient } from "@/lib/auth-client";
-import { useUpload } from "@/hooks/useUpload";
-import { Logo } from "@/components/Logo";
-import {
-  ArrowRight, Zap, Shield, Sparkles,
-  Upload, ShieldCheck, User, LogOut, Loader2
-} from "lucide-react";
 
 export default function LandingPageClient() {
   const router = useRouter();

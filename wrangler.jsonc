@@ -34,7 +34,6 @@
       "localConnectionString": "postgresql://neondb_owner:npg_eCRnO5Li2vUY@ep-dawn-queen-ao35phwy-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
     },
   ],
-
   // 2. Configure queues for background processing
   "queues": {
     "producers": [
@@ -58,7 +57,6 @@
       "id": "82b5a7209be6489590576c6c4d3e77d2",
     },
   ],
-
   // 4. Configure Workflows for orchestrating complex tasks
   "workflows": [
     {
@@ -76,7 +74,6 @@
       },
     ],
   },
-
   // 6. Migrations for Durable Objects
   "migrations": [
     {
@@ -84,9 +81,16 @@
       "new_sqlite_classes": ["ChatRoomDO"],
     },
   ],
-
   // 7. Configure Workers AI for PDF Embeddings and LLM Chat
   "ai": {
     "binding": "AI",
   },
+  // 8. Configure Vectorization
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "pdf-chunks",
+      "remote": true,
+    },
+  ],
 }

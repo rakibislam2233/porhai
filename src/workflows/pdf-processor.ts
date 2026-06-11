@@ -1,12 +1,11 @@
 import { getDb } from "@/lib/db";
-import { chunks, documents } from "@/lib/db/schema";
+import {documents } from "@/lib/db/schema";
 import {
   WorkflowEntrypoint,
   WorkflowStep,
   WorkflowEvent,
 } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-import { env } from "process";
 
 export class PorhaiWorkflow extends WorkflowEntrypoint<
   CloudflareEnv,
@@ -19,25 +18,26 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
     const { documentId } = event.payload;
     const db = getDb(this.env);
 
-    // 🛠️ Step 1 Replacement Blueprint (No fs / No path dependency)
+    // 🛠️ Step 1: Fetch PDF from Database URL (No fs dependency)
     const pdfBufferData = await step.do("fetch-pdf", async () => {
       const doc = await db.query.documents.findFirst({
         where: eq(documents.id, documentId),
       });
       if (!doc) throw new Error("Document not found");
-      const targetUrl = doc.b2Url.startsWith("http")
-        ? doc.b2Url
-        : `${env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL}/${doc.b2Url}`;
+      const targetUrl = doc.fileUrl;
+      if (!targetUrl) throw new Error("No file URL found in document record");
 
       const response = await fetch(targetUrl);
       if (!response.ok)
-        throw new Error("Failed to fetch PDF payload from storage network");
+        throw new Error(
+          `Failed to fetch PDF from storage: ${response.statusText}`,
+        );
 
       const fileBuffer = await response.arrayBuffer();
 
       return {
         buffer: Array.from(new Uint8Array(fileBuffer)),
-        b2Key: doc.b2Key,
+        fileName: doc.fileName,
       };
     });
 
@@ -45,7 +45,7 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
       throw new Error("Failed to read local PDF file data");
     }
 
-    // Step 2: Process the PDF (Text Extraction logic fixed)
+    // 🛠️ Step 2: Process the PDF (Sentence-Aware Chunking)
     const extractedChunks = await step.do("extract-chunks", async () => {
       const { getDocument } = await import("pdfjs-serverless");
       const uint8 = new Uint8Array(pdfBufferData.buffer);
@@ -57,51 +57,92 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
         const textContent = await page.getTextContent();
         const pageText = textContent.items
           .map((item: any) => item.str)
-          .join(" ");
+          .join(" ")
+          .trim();
 
-        if (!pageText.trim()) continue;
+        if (!pageText) continue;
+        const sentences = pageText.match(/[^.!?]+[.!?]+/g) || [pageText];
+        let current = "";
 
-        const words = pageText.split(/\s+/); // Better whitespace split
-        let chunk = "";
-
-        for (const word of words) {
-          chunk += word + " ";
-          if (chunk.length > 1000) {
-            allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
-            chunk = "";
+        for (const sentence of sentences) {
+          if ((current + sentence).length > 800) {
+            if (current.trim()) {
+              allChunks.push({ content: current.trim(), pageNumber: pageNum });
+            }
+            current = sentence;
+          } else {
+            current += " " + sentence;
           }
         }
-        if (chunk.trim()) {
-          allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
+        if (current.trim()) {
+          allChunks.push({ content: current.trim(), pageNumber: pageNum });
         }
       }
       return allChunks;
     });
 
-    // Step 3: Save the extracted chunks back to the database
+    // 🛠️ Step 3: Embed, Save to Vectorize & Drizzle DB in Batches
     await step.do("embed-and-save", async () => {
-      for (const chunk of extractedChunks) {
-        const embeddingResult = await this.env.AI.run(
-          "@cf/baai/bge-base-en-v1.5",
-          {
-            text: chunk.content,
-          },
+      const BATCH_SIZE = 10;
+      const vectors: VectorizeVector[] = [];
+
+      for (let i = 0; i < extractedChunks.length; i += BATCH_SIZE) {
+        const batch = extractedChunks.slice(i, i + BATCH_SIZE);
+        const batchVectors = await Promise.all(
+          batch.map(async (chunk, j) => {
+            try {
+              const embeddingResult = await this.env.AI.run(
+                "@cf/baai/bge-base-en-v1.5",
+                { text: chunk.content },
+              );
+
+              if (
+                !embeddingResult ||
+                !("data" in embeddingResult) ||
+                !embeddingResult.data?.[0]
+              ) {
+                return null;
+              }
+
+              const globalIndex = i + j;
+
+              return {
+                id: `${documentId}-${globalIndex}`,
+                values: embeddingResult.data[0],
+                metadata: {
+                  documentId,
+                  content: chunk.content,
+                  pageNumber: chunk.pageNumber,
+                },
+                dbData: {
+                  documentId,
+                  content: chunk.content,
+                  pageNumber: chunk.pageNumber,
+                  embedding: embeddingResult.data[0],
+                },
+              };
+            } catch (err) {
+              console.error("Embedding chunk failed", err);
+              return null;
+            }
+          }),
         );
-
-        if (!("data" in embeddingResult) || !embeddingResult.data?.[0]) {
-          throw new Error("Failed to generate embedding");
+        for (const vec of batchVectors) {
+          if (vec) {
+            vectors.push({
+              id: vec.id,
+              values: vec.values,
+              metadata: vec.metadata,
+            });
+          }
         }
-
-        await db.insert(chunks).values({
-          documentId,
-          content: chunk.content,
-          pageNumber: chunk.pageNumber,
-          embedding: embeddingResult.data[0],
-        });
+      }
+      if (vectors.length > 0 && this.env.VECTORIZE) {
+        await this.env.VECTORIZE.upsert(vectors);
       }
     });
 
-    // Step 4: Update the document status in the database & KV
+    // 🛠️ Step 4: Update the document status in the database & KV
     await step.do("update-document-status", async () => {
       await db
         .update(documents)

@@ -1,8 +1,8 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Dashboard from '@/components/Dashboard';
-import { PDFDocument, DocumentsResponse } from '@/types/chat';
+import { DocumentsResponse, PDFDocument } from '@/types/chat';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function DashboardClient() {
   const router = useRouter();

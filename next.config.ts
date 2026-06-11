@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "http://localhost:3000",
     "172.19.117.207",
-    "rakib3000.mdrakib.me",
-    "https://rakib3000.mdrakib.me"
+    "porhai.mdrakib.me",
+    "https://porhai.mdrakib.me",
   ],
   async headers() {
     return [

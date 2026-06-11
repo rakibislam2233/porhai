@@ -1,21 +1,22 @@
 "use client";
+'use client';
 import { useChatSession } from "@/hooks/useChatSession";
 import { Message, PDFDocument } from "@/types/chat";
 import {
   ArrowLeft,
-  BookOpen,
   Bot,
   Check,
   Copy,
   Download,
   FileText,
-  Layers,
   Menu,
   Send,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatPanelProps {
   doc: PDFDocument;
@@ -69,7 +70,7 @@ export default function ChatPanel({
         {
           id: "welcome",
           sender: "assistant",
-          text: `Hello! I have completed processing **${doc.name}** (${doc.size}, ${doc.pageCount} pages). \n\nFeel free to ask me anything about the contents!`,
+          text: `Hello! I have completed processing **${doc.name}**.\n\nFeel free to ask me anything about the contents!`,
           timestamp: new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -117,6 +118,7 @@ export default function ChatPanel({
     try {
       const history = messages
         .filter((m) => m.id !== "welcome")
+        .slice(-6)
         .map((m) => ({
           role: m.sender === "user" ? "user" : "assistant",
           content: m.text,
@@ -142,10 +144,6 @@ export default function ChatPanel({
       if (!res.body) {
         throw new Error("Response body is null");
       }
-
-      const sources = JSON.parse(
-        res.headers.get("X-Sources") ?? "[]",
-      ) as number[];
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -180,9 +178,6 @@ export default function ChatPanel({
           }
         }
       }
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
-      );
     } catch (e) {
       console.error("STREAM ERROR:", e);
       setMessages((prev) =>
@@ -230,7 +225,7 @@ export default function ChatPanel({
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      {/* SIDEBAR */}
+      {/* Mobile overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div
@@ -241,94 +236,93 @@ export default function ChatPanel({
             className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
           />
         )}
-        <motion.aside className="fixed inset-y-0 left-0 w-80 bg-white border-r border-slate-200 flex flex-col h-full z-50 lg:static lg:translate-x-0 flex-shrink-0">
-          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-            <button
-              onClick={onBack}
-              className="flex items-center space-x-2 text-slate-600 font-semibold text-sm"
-            >
-              <ArrowLeft size={16} />
-              <span>Dashboard</span>
-            </button>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-1.5 text-slate-400"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="p-5 border-b border-slate-200 bg-slate-50">
-            <div className="flex items-start space-x-3 mb-4">
-              <div className="p-2.5 bg-cyan-600 text-white rounded-lg">
-                <FileText size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-tight">
-                  {doc.name}
-                </h3>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                  ID: {doc.id.slice(0, 8)}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2 bg-white border border-slate-200 rounded-lg p-3 text-xs font-medium text-slate-700">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 flex items-center">
-                  <Layers size={14} className="mr-1.5" /> Pages
-                </span>
-                <span>{doc.pageCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 flex items-center">
-                  <BookOpen size={14} className="mr-1.5" /> Size
-                </span>
-                <span>{doc.size}</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                <span className="text-slate-500">Status</span>
-                <span className="text-cyan-600 font-semibold flex items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 mr-1.5" />
-                  Analyzed
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Other Documents
-            </h4>
-            <div className="space-y-1">
-              {otherDocs.filter((d) => d.id !== doc.id).length === 0 ? (
-                <div className="text-xs text-slate-400 bg-slate-50 p-3 rounded-lg text-center border border-dashed border-slate-200">
-                  No other PDFs found
-                </div>
-              ) : (
-                otherDocs
-                  .filter((d) => d.id !== doc.id)
-                  .map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => {
-                        onSelectDoc(d);
-                        setIsSidebarOpen(false);
-                      }}
-                      className="w-full text-left p-2.5 rounded-lg flex items-center space-x-2 text-sm text-slate-700"
-                    >
-                      <div className="p-1.5 bg-slate-100 rounded-md">
-                        <FileText size={14} className="text-slate-500" />
-                      </div>
-                      <span className="truncate flex-1 font-medium">
-                        {d.name}
-                      </span>
-                    </button>
-                  ))
-              )}
-            </div>
-          </div>
-        </motion.aside>
       </AnimatePresence>
+
+      {/* SIDEBAR — AnimatePresence এর বাইরে */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 w-80 bg-white border-r border-slate-200
+          flex flex-col h-full z-50 transition-transform duration-300
+          lg:static lg:translate-x-0 flex-shrink-0
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="flex items-center space-x-2 text-slate-600 font-semibold text-sm"
+          >
+            <ArrowLeft size={16} />
+            <span>Dashboard</span>
+          </button>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden p-1.5 text-slate-400"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-start space-x-3 mb-3">
+            <div className="p-2.5 bg-cyan-600 text-white rounded-lg flex-shrink-0">
+              <FileText size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-tight">
+                {doc.name}
+              </h3>
+              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                ID: {doc.id.slice(0, 8)}
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-between items-center bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium">
+            <span className="text-slate-500">Status</span>
+            <span className="text-cyan-600 font-semibold flex items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 mr-1.5" />
+              {doc.status === "completed"
+                ? "Analyzed"
+                : doc.status === "processing"
+                  ? "Processing..."
+                  : "Failed"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            Other Documents
+          </h4>
+          <div className="space-y-1">
+            {otherDocs.filter((d) => d.id !== doc.id).length === 0 ? (
+              <div className="text-xs text-slate-400 bg-slate-50 p-3 rounded-lg text-center border border-dashed border-slate-200">
+                No other PDFs found
+              </div>
+            ) : (
+              otherDocs
+                .filter((d) => d.id !== doc.id)
+                .map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => {
+                      onSelectDoc(d);
+                      setIsSidebarOpen(false);
+                    }}
+                    className="w-full text-left p-2.5 rounded-lg flex items-center space-x-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="p-1.5 bg-slate-100 rounded-md flex-shrink-0">
+                      <FileText size={14} className="text-slate-500" />
+                    </div>
+                    <span className="truncate flex-1 font-medium">
+                      {d.name}
+                    </span>
+                  </button>
+                ))
+            )}
+          </div>
+        </div>
+      </aside>
 
       {/* CHAT AREA */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
@@ -346,15 +340,13 @@ export default function ChatPanel({
               <span>AI Assistant</span>
             </h2>
           </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={handleDownloadTranscript}
-              className="text-slate-500 p-1.5 lg:p-2 rounded-md"
-              title="Download Transcript"
-            >
-              <Download size={18} />
-            </button>
-          </div>
+          <button
+            onClick={handleDownloadTranscript}
+            className="text-slate-500 p-1.5 lg:p-2 rounded-md hover:bg-slate-50 transition-colors"
+            title="Download Transcript"
+          >
+            <Download size={18} />
+          </button>
         </div>
 
         {/* Messages */}
@@ -388,64 +380,92 @@ export default function ChatPanel({
                             : "bg-white text-slate-800 rounded-2xl rounded-tl-sm border border-slate-200"
                         }`}
                       >
-                        <div className="space-y-3">
-                          {msg.text.split("\n\n").map((paragraph, pIdx) => {
-                            if (paragraph.startsWith("###"))
-                              return (
-                                <h4
-                                  key={pIdx}
-                                  className="font-bold text-slate-900 text-base"
-                                >
-                                  {paragraph.replace("###", "").trim()}
-                                </h4>
-                              );
-                            if (
-                              paragraph.startsWith("*") ||
-                              paragraph.startsWith("-")
-                            )
-                              return (
-                                <ul
-                                  key={pIdx}
-                                  className="list-disc pl-5 space-y-1"
-                                >
-                                  {paragraph.split("\n").map((line, lIdx) => (
-                                    <li key={lIdx}>
-                                      {line
-                                        .replace(/^[\s*-]+/, "")
-                                        .trim()
-                                        .split("**")
-                                        .map((chunk, cIdx) =>
-                                          cIdx % 2 === 1 ? (
-                                            <strong key={cIdx}>{chunk}</strong>
-                                          ) : (
-                                            chunk
-                                          ),
-                                        )}
-                                    </li>
-                                  ))}
-                                </ul>
-                              );
-                            return (
-                              <p key={pIdx}>
-                                {paragraph
-                                  .split("**")
-                                  .map((chunk, cIdx) =>
-                                    cIdx % 2 === 1 ? (
-                                      <strong key={cIdx}>{chunk}</strong>
-                                    ) : (
-                                      chunk
-                                    ),
-                                  )}
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => (
+                              <p
+                                className={`mb-2 last:mb-0 ${msg.sender === "user" ? "text-white" : "text-slate-800"}`}
+                              >
+                                {children}
                               </p>
-                            );
-                          })}
-                        </div>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="list-disc pl-5 space-y-1 mb-2">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="list-decimal pl-5 space-y-1 mb-2">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li
+                                className={`text-sm ${msg.sender === "user" ? "text-white" : "text-slate-700"}`}
+                              >
+                                {children}
+                              </li>
+                            ),
+                            strong: ({ children }) => (
+                              <strong
+                                className={`font-bold ${msg.sender === "user" ? "text-white" : "text-slate-900"}`}
+                              >
+                                {children}
+                              </strong>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="font-bold text-base mt-3 mb-1 text-slate-900">
+                                {children}
+                              </h3>
+                            ),
+                            h4: ({ children }) => (
+                              <h4 className="font-semibold mt-2 mb-1 text-slate-900">
+                                {children}
+                              </h4>
+                            ),
+                            table: ({ children }) => (
+                              <div className="overflow-x-auto my-3">
+                                <table className="min-w-full border border-slate-200 text-sm rounded-lg overflow-hidden">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            thead: ({ children }) => (
+                              <thead className="bg-slate-100">{children}</thead>
+                            ),
+                            th: ({ children }) => (
+                              <th className="px-4 py-2 text-left font-semibold border-b border-slate-200 text-slate-700">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="px-4 py-2 border-b border-slate-100 text-slate-700">
+                                {children}
+                              </td>
+                            ),
+                            code: ({ children, className }) => {
+                              const isBlock = className?.includes("language-");
+                              return isBlock ? (
+                                <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto my-3 text-xs">
+                                  <code>{children}</code>
+                                </pre>
+                              ) : (
+                                <code className="bg-slate-100 text-cyan-700 px-1.5 py-0.5 rounded text-xs font-mono">
+                                  {children}
+                                </code>
+                              );
+                            },
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
 
                         {msg.sender === "assistant" && (
-                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <div className="mt-3 pt-3 border-t border-slate-100">
                             <button
                               onClick={() => handleCopyText(msg.text, msg.id)}
-                              className="text-slate-400 flex items-center space-x-1 text-xs bg-slate-50 px-2 py-1 rounded-md"
+                              className="text-slate-400 flex items-center space-x-1 text-xs bg-slate-50 px-2 py-1 rounded-md hover:bg-slate-100 transition-colors"
                             >
                               {copiedId === msg.id ? (
                                 <>
@@ -462,21 +482,6 @@ export default function ChatPanel({
                                 </>
                               )}
                             </button>
-                            {msg.sources && msg.sources.length > 0 && (
-                              <div className="flex items-center space-x-1 flex-wrap">
-                                <span className="text-slate-400 text-xs">
-                                  Sources:
-                                </span>
-                                {msg.sources.map((page) => (
-                                  <span
-                                    key={page}
-                                    className="text-xs bg-cyan-50 text-cyan-600 border border-cyan-100 px-2 py-0.5 rounded font-medium"
-                                  >
-                                    p.{page}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -526,7 +531,7 @@ export default function ChatPanel({
                   <button
                     key={i}
                     onClick={() => handleSendMessage(s.query)}
-                    className="text-xs lg:text-sm bg-white border border-slate-200 text-slate-600 px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg font-medium"
+                    className="text-xs lg:text-sm bg-white border border-slate-200 text-slate-600 px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors"
                   >
                     {s.text}
                   </button>

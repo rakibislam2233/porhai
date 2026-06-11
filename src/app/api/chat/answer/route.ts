@@ -1,8 +1,7 @@
-import { getDb } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
 import { getEnv } from "@/lib/cf-env";
+import { getDb } from "@/lib/db";
 import { chatMessages } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 type ChatAnswerRequest = {
@@ -10,11 +9,6 @@ type ChatAnswerRequest = {
   documentId: string;
   sessionId: string;
   history: { role: string; content: string }[];
-};
-
-type ChunkRow = {
-  content: string;
-  page_number: number;
 };
 
 export const POST = async (request: NextRequest) => {
@@ -37,35 +31,37 @@ export const POST = async (request: NextRequest) => {
       );
     }
 
-    const db = getDb(env);
-
-    // Step 1: Question embedding
+    // Step 1: Embed the question
     const queryEmbedding = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
       text: question,
     });
 
     if (!("data" in queryEmbedding) || !queryEmbedding.data?.[0]) {
-      return NextResponse.json(
-        { error: "Failed to generate embedding" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Embedding failed" }, { status: 500 });
     }
 
-    // Step 2: Vector similarity — top 5 relevant chunks
-    const similarChunks = await db.execute(sql`
-      SELECT content, page_number
-      FROM chunks
-      WHERE document_id = ${documentId}
-      ORDER BY embedding <=> ${JSON.stringify(queryEmbedding.data[0])}::vector
-      LIMIT 5
-    `);
+    console.log("Query Embedding", queryEmbedding.data[0]);
+    console.log("Document ID", documentId);
 
-    const chunkRows = similarChunks as unknown as ChunkRow[];
-    const context = chunkRows
-      .map((c) => `[Page ${c.page_number}]: ${c.content}`)
+    // Step 2: Query Vectorize
+    const results = await env.VECTORIZE.query(queryEmbedding.data[0], {
+      topK: 5,
+      filter: { id: "7abe751e-c6eb-45cd-8449-619347d2d5a7" },
+      returnMetadata: "all",
+    });
+
+    console.log("Vector Search", results);
+
+    // Step 3: Filter by similarity score and build context
+    const relevantMatches = results.matches.filter(
+      (m) => (m.score ?? 0) > 0.55,
+    );
+
+    const context = relevantMatches
+      .map((m) => `[Page ${m.metadata?.pageNumber}]: ${m.metadata?.content}`)
       .join("\n\n");
 
-    // Step 3: AI stream response
+    // Step 4: Stream AI response
     const aiResponse = await env.AI.run(
       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       {
@@ -74,31 +70,36 @@ export const POST = async (request: NextRequest) => {
             role: "system",
             content: `You are a helpful assistant for document Q&A.
 
-CRITICAL LANGUAGE RULE:
-- Carefully detect the language/script of the user's latest question
-- If the question is in Bengali script (বাংলা), reply entirely in Bengali
-- If the question is in Banglish (Bengali words written in English letters, e.g. "ki ache", "keno holo", "ami jante chai"), reply entirely in Banglish
-- If the question is in English, reply entirely in English
-- Never mix languages. Always match the user's language exactly.
+LANGUAGE RULE:
+- Bengali script → reply in Bengali
+- Banglish → reply in Banglish
+- English → reply in English
+
+FORMATTING RULES:
+- Use **bold** for important terms
+- Use bullet lists for multiple points
+- Use numbered lists for steps
+- Use ### for section headings
+- Use markdown tables for comparisons
+- Add blank line between paragraphs
 
 ANSWER RULES:
-- Answer based ONLY on the provided document context below
-- If the answer is not in the context, say so in the same language as the question
-- Always mention page numbers when referencing specific content
+- Answer ONLY from the document context below
+- Mention page numbers when referencing content
+- If answer not in context, say so clearly
 
 Document Context:
 ${context}`,
           },
-          ...history,
+          ...history.slice(-6),
           { role: "user", content: question },
         ],
         stream: true,
       },
     );
 
-    // Step 4: TransformStream — token collect + DB save on flush
+    // Step 5: Stream + save to DB on flush
     let fullAnswer = "";
-    const sources = [...new Set(chunkRows.map((c) => c.page_number))];
 
     const transform = new TransformStream({
       transform(chunk, controller) {
@@ -117,23 +118,23 @@ ${context}`,
       async flush() {
         if (!fullAnswer) return;
         try {
+          const db = getDb(env);
           await db.insert(chatMessages).values([
-            { sessionId, role: "user", content: question, sources: null },
-            { sessionId, role: "assistant", content: fullAnswer, sources },
+            { sessionId, role: "user", content: question },
+            { sessionId, role: "assistant", content: fullAnswer },
           ]);
-          console.log("=== DB SAVE SUCCESS ===");
         } catch (err) {
-          console.error("=== DB SAVE FAILED ===", err);
+          console.error("DB save failed:", err);
         }
       },
     });
+
     (aiResponse as ReadableStream).pipeTo(transform.writable);
 
     return new Response(transform.readable, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "X-Sources": JSON.stringify(sources),
       },
     });
   } catch (error) {

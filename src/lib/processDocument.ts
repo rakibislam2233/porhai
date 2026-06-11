@@ -1,92 +1,111 @@
 import { getDb } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { chunks, documents } from "./db/schema";
-import { promises as fs } from "fs";
-import path from "path";
+import { documents } from "./db/schema";
 const { getDocument: getPdfDocument } = await import("pdfjs-serverless");
+
 export async function processDocument(env: CloudflareEnv, documentId: string) {
-  console.log(
-    "============================ Starting to process document locally =============================",
-  );
   const db = getDb(env);
+
   try {
-    // Step 1: Fetch Document details from Database
+    // Step 1: Document fetch from DB
     const doc = await db.query.documents.findFirst({
       where: eq(documents.id, documentId),
     });
-
     if (!doc) throw new Error("Document not found");
-    console.log(`📂 Reading local file from path: ${doc.b2Url}`);
-    const absoluteFilePath = path.join(process.cwd(), "public", doc.b2Url);
-    const fileBuffer = await fs.readFile(absoluteFilePath);
 
-    // ArrayBuffer components setup
-    const buffer = fileBuffer.buffer.slice(
-      fileBuffer.byteOffset,
-      fileBuffer.byteOffset + fileBuffer.byteLength,
-    );
-    const uint8 = new Uint8Array(buffer);
+    // Step 2: Direct get public url for doc
+    const fileUrl = doc.fileUrl;
+    const response = await fetch(fileUrl);
 
-    // Step 2: Extract chunks
-    const pdf = await getPdfDocument({ data: uint8 }).promise;
-    console.log("Pdf", pdf);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Step 3: Text extract and chunk
+    const pdf = await getPdfDocument({ data: uint8Array }).promise;
     const allChunks: { content: string; pageNumber: number }[] = [];
-
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      console.log(`Extracting text from page ${pageNum}...`);
       const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ")
+        .trim();
 
-      console.log(`Page ${pageNum} has ${textContent.items.length} text items`);
-      const pageText = textContent.items.map((item: any) => item.str).join(" ");
+      if (!pageText) continue;
 
-      if (!pageText.trim()) continue;
+      // Sentence-aware chunking
+      const sentences = pageText.match(/[^.!?]+[.!?]+/g) || [pageText];
+      let current = "";
 
-      const words = pageText.split(" ");
-      let chunk = "";
-
-      for (const word of words) {
-        chunk += word + " ";
-        if (chunk.length > 1000) {
-          allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
-          chunk = "";
+      for (const sentence of sentences) {
+        if ((current + sentence).length > 800) {
+          if (current.trim()) {
+            allChunks.push({ content: current.trim(), pageNumber: pageNum });
+          }
+          current = sentence;
+        } else {
+          current += " " + sentence;
         }
       }
-
-      if (chunk.trim()) {
-        allChunks.push({ content: chunk.trim(), pageNumber: pageNum });
+      if (current.trim()) {
+        allChunks.push({ content: current.trim(), pageNumber: pageNum });
       }
     }
 
-    console.log(`Extracted ${JSON.stringify(allChunks)} chunks from PDF`);
+    // Step 4: Embed and upsert into Vectorize in batches
+    const BATCH_SIZE = 10;
+    const vectors: VectorizeVector[] = [];
 
-    // Step 3: Embed and save
-    for (const chunk of allChunks) {
-      const embeddingResult = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-        text: chunk.content,
-      });
+    console.log("All Chunk", allChunks);
 
-      if (!("data" in embeddingResult) || !embeddingResult.data?.[0]) {
-        throw new Error("Failed to generate embedding");
+    for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
+      const batch = allChunks.slice(i, i + BATCH_SIZE);
+      const batchVectors = await Promise.all(
+        batch.map(async (chunk, j) => {
+          const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+            text: chunk.content,
+          });
+          if (!result || !("data" in result) || !result.data?.[0]) {
+            return null;
+          }
+          const globalIndex = i + j;
+          console.log("Id", `${documentId}-${globalIndex}`);
+          return {
+            id: `${documentId}-${globalIndex}`,
+            values: result.data[0],
+            metadata: {
+              documentId,
+              content: chunk.content,
+              pageNumber: chunk.pageNumber,
+            },
+          };
+        }),
+      );
+      for (const vec of batchVectors) {
+        if (vec) vectors.push(vec);
       }
-
-      await db.insert(chunks).values({
-        documentId,
-        content: chunk.content,
-        pageNumber: chunk.pageNumber,
-        embedding: embeddingResult.data[0],
-      });
     }
 
-    // Step 4: Update status to completed
+    // Single upsert call
+    if (vectors.length > 0) {
+      await env.VECTORIZE.upsert(vectors);
+    }
+
+    // Step 5: Mark as completed
     await db
       .update(documents)
       .set({ status: "completed" })
       .where(eq(documents.id, documentId));
 
-    console.log(`Document ${documentId} processed successfully`);
+    console.log(
+      `Document ${documentId} processed — ${vectors.length} vectors stored`,
+    );
   } catch (error) {
-    console.error(`Document processing failed for ${documentId}:`, error);
+    console.error(`Processing failed for ${documentId}:`, error);
     await db
       .update(documents)
       .set({ status: "failed" })

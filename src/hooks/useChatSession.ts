@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Message, ChatSessionResponse } from "@/types/chat";
+
 export function useChatSession(documentId: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
@@ -20,7 +21,6 @@ export function useChatSession(documentId: string) {
             id: m.id,
             sender: m.role === "user" ? "user" : "assistant",
             text: m.content,
-            sources: m.sources ?? undefined,
             timestamp: new Date(m.createdAt).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",

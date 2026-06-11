@@ -1,12 +1,11 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
+  integer,
   pgTable,
   text,
   timestamp,
-  boolean,
-  integer,
   uuid,
-  vector,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("user", {
@@ -66,26 +65,14 @@ export const documents = pgTable("documents", {
     .references(() => users.id),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size"),
-  b2Key: text("b2_key").notNull(),
-  b2Url: text("b2_url").notNull().default(""),
+  fileUrl: text("file_url").notNull(),
   status: text("status")
     .$type<"uploading" | "processing" | "completed" | "failed">()
     .default("uploading")
     .notNull(),
-  pageCount: integer("page_count"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const chunks = pgTable("chunks", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  documentId: uuid("document_id")
-    .references(() => documents.id, { onDelete: "cascade" })
-    .notNull(),
-  content: text("content").notNull(),
-  pageNumber: integer("page_number"),
-  embedding: vector("embedding", { dimensions: 768 }),
-  createdAt: timestamp("created_at").defaultNow(),
-});
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id")
@@ -114,21 +101,6 @@ export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
 }));
 
-export const documentsRelations = relations(documents, ({ one, many }) => ({
-  user: one(users, {
-    fields: [documents.userId],
-    references: [users.id],
-  }),
-  chunks: many(chunks),
-}));
-
-export const chunksRelations = relations(chunks, ({ one }) => ({
-  document: one(documents, {
-    fields: [chunks.documentId],
-    references: [documents.id],
-  }),
-}));
-
 export const chatSessionsRelations = relations(
   chatSessions,
   ({ one, many }) => ({
@@ -154,6 +126,5 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
 export type NewUser = typeof users.$inferInsert;
-export type NewChunk = typeof chunks.$inferInsert;
 export type NewChatSession = typeof chatSessions.$inferInsert;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
