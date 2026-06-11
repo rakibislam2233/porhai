@@ -1,13 +1,21 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  ArrowLeft, Send, FileText, BookOpen,
-  Layers, Bot, Copy, Check, Download,
-  Menu, X, Trash2,
-} from "lucide-react";
-import { PDFDocument, Message, ChatAnswerResponse } from "@/types/chat";
 import { useChatSession } from "@/hooks/useChatSession";
+import { Message, PDFDocument } from "@/types/chat";
+import {
+  ArrowLeft,
+  BookOpen,
+  Bot,
+  Check,
+  Copy,
+  Download,
+  FileText,
+  Layers,
+  Menu,
+  Send,
+  X,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 
 interface ChatPanelProps {
   doc: PDFDocument;
@@ -22,8 +30,11 @@ export default function ChatPanel({
   otherDocs,
   onSelectDoc,
 }: ChatPanelProps) {
-  const { sessionId, initialMessages, loading: sessionLoading } =
-    useChatSession(doc.id);
+  const {
+    sessionId,
+    initialMessages,
+    loading: sessionLoading,
+  } = useChatSession(doc.id);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -33,10 +44,21 @@ export default function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const sampleSuggestions = [
-    { text: "Summarize insights", query: "Summarize the key insights of this document." },
-    { text: "List statistics", query: "Are there any critical metrics or statistics in this PDF? List them." },
-    { text: "Core lessons", query: "What are the core lessons or recommendations presented?" },
+    {
+      text: "Summarize insights",
+      query: "Summarize the key insights of this document.",
+    },
+    {
+      text: "List statistics",
+      query:
+        "Are there any critical metrics or statistics in this PDF? List them.",
+    },
+    {
+      text: "Core lessons",
+      query: "What are the core lessons or recommendations presented?",
+    },
   ];
+
   useEffect(() => {
     if (sessionLoading) return;
 
@@ -78,10 +100,23 @@ export default function ChatPanel({
     setInputText("");
     setIsTyping(true);
 
+    const assistantId = `assistant-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        sender: "assistant",
+        text: "",
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      },
+    ]);
+
     try {
       const history = messages
         .filter((m) => m.id !== "welcome")
-        .slice(-6)
         .map((m) => ({
           role: m.sender === "user" ? "user" : "assistant",
           content: m.text,
@@ -98,34 +133,65 @@ export default function ChatPanel({
         }),
       });
 
-      const data = (await res.json()) as ChatAnswerResponse;
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("API ERROR:", res.status, err);
+        throw new Error(`API responded with ${res.status}`);
+      }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: data.answer,
-          sources: data.sources,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
-          sender: "assistant",
-          text: "Something went wrong. Please try again.",
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
+      if (!res.body) {
+        throw new Error("Response body is null");
+      }
+
+      const sources = JSON.parse(
+        res.headers.get("X-Sources") ?? "[]",
+      ) as number[];
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      setIsTyping(false);
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const token = parsed.response;
+            if (token) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, text: m.text + token } : m,
+                ),
+              );
+            }
+          } catch (e) {
+            console.error("PARSE ERROR:", e, "LINE:", line);
+          }
+        }
+      }
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
+      );
+    } catch (e) {
+      console.error("STREAM ERROR:", e);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, text: "Something went wrong. Please try again." }
+            : m,
+        ),
+      );
     } finally {
       setIsTyping(false);
     }
@@ -140,7 +206,10 @@ export default function ChatPanel({
   const handleDownloadTranscript = () => {
     const header = `Chat Transcript\nDocument: ${doc.name}\nDate: ${new Date().toLocaleDateString()}\n\n========================================\n\n`;
     const body = messages
-      .map((m) => `[${m.timestamp}] ${m.sender === "user" ? "User" : "AI"}:\n${m.text}\n`)
+      .map(
+        (m) =>
+          `[${m.timestamp}] ${m.sender === "user" ? "User" : "AI"}:\n${m.text}\n`,
+      )
       .join("\n---\n\n");
     const element = document.createElement("a");
     const file = new Blob([header + body], { type: "text/plain" });
@@ -172,12 +241,7 @@ export default function ChatPanel({
             className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
           />
         )}
-        <motion.aside
-          // initial={{ x: -320 }}
-          // animate={{ x: isSidebarOpen ? 0 : -320 }}
-          // transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="fixed inset-y-0 left-0 w-80 bg-white border-r border-slate-200 flex flex-col h-full z-50 lg:static lg:translate-x-0 flex-shrink-0"
-        >
+        <motion.aside className="fixed inset-y-0 left-0 w-80 bg-white border-r border-slate-200 flex flex-col h-full z-50 lg:static lg:translate-x-0 flex-shrink-0">
           <div className="p-4 border-b border-slate-200 flex items-center justify-between">
             <button
               onClick={onBack}
@@ -246,13 +310,18 @@ export default function ChatPanel({
                   .map((d) => (
                     <button
                       key={d.id}
-                      onClick={() => { onSelectDoc(d); setIsSidebarOpen(false); }}
+                      onClick={() => {
+                        onSelectDoc(d);
+                        setIsSidebarOpen(false);
+                      }}
                       className="w-full text-left p-2.5 rounded-lg flex items-center space-x-2 text-sm text-slate-700"
                     >
                       <div className="p-1.5 bg-slate-100 rounded-md">
                         <FileText size={14} className="text-slate-500" />
                       </div>
-                      <span className="truncate flex-1 font-medium">{d.name}</span>
+                      <span className="truncate flex-1 font-medium">
+                        {d.name}
+                      </span>
                     </button>
                   ))
               )}
@@ -299,47 +368,74 @@ export default function ChatPanel({
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={`flex space-x-3 max-w-[85%] lg:max-w-[75%] ${msg.sender === "user" ? "flex-row-reverse space-x-reverse" : "flex-row"}`}>
+                  <div
+                    className={`flex space-x-3 max-w-[85%] lg:max-w-[75%] ${
+                      msg.sender === "user"
+                        ? "flex-row-reverse space-x-reverse"
+                        : "flex-row"
+                    }`}
+                  >
                     {msg.sender === "assistant" && (
                       <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-lg bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 mt-1">
                         <Bot size={20} />
                       </div>
                     )}
                     <div>
-                      <div className={`px-5 py-4 text-sm lg:text-base leading-relaxed ${
-                        msg.sender === "user"
-                          ? "bg-cyan-600 text-white rounded-2xl rounded-tr-sm"
-                          : "bg-white text-slate-800 rounded-2xl rounded-tl-sm border border-slate-200"
-                      }`}>
+                      <div
+                        className={`px-5 py-4 text-sm lg:text-base leading-relaxed ${
+                          msg.sender === "user"
+                            ? "bg-cyan-600 text-white rounded-2xl rounded-tr-sm"
+                            : "bg-white text-slate-800 rounded-2xl rounded-tl-sm border border-slate-200"
+                        }`}
+                      >
                         <div className="space-y-3">
                           {msg.text.split("\n\n").map((paragraph, pIdx) => {
                             if (paragraph.startsWith("###"))
                               return (
-                                <h4 key={pIdx} className="font-bold text-slate-900 text-base">
+                                <h4
+                                  key={pIdx}
+                                  className="font-bold text-slate-900 text-base"
+                                >
                                   {paragraph.replace("###", "").trim()}
                                 </h4>
                               );
-                            if (paragraph.startsWith("*") || paragraph.startsWith("-"))
+                            if (
+                              paragraph.startsWith("*") ||
+                              paragraph.startsWith("-")
+                            )
                               return (
-                                <ul key={pIdx} className="list-disc pl-5 space-y-1">
+                                <ul
+                                  key={pIdx}
+                                  className="list-disc pl-5 space-y-1"
+                                >
                                   {paragraph.split("\n").map((line, lIdx) => (
                                     <li key={lIdx}>
-                                      {line.replace(/^[\s*-]+/, "").trim().split("**").map((chunk, cIdx) =>
-                                        cIdx % 2 === 1
-                                          ? <strong key={cIdx}>{chunk}</strong>
-                                          : chunk
-                                      )}
+                                      {line
+                                        .replace(/^[\s*-]+/, "")
+                                        .trim()
+                                        .split("**")
+                                        .map((chunk, cIdx) =>
+                                          cIdx % 2 === 1 ? (
+                                            <strong key={cIdx}>{chunk}</strong>
+                                          ) : (
+                                            chunk
+                                          ),
+                                        )}
                                     </li>
                                   ))}
                                 </ul>
                               );
                             return (
                               <p key={pIdx}>
-                                {paragraph.split("**").map((chunk, cIdx) =>
-                                  cIdx % 2 === 1
-                                    ? <strong key={cIdx}>{chunk}</strong>
-                                    : chunk
-                                )}
+                                {paragraph
+                                  .split("**")
+                                  .map((chunk, cIdx) =>
+                                    cIdx % 2 === 1 ? (
+                                      <strong key={cIdx}>{chunk}</strong>
+                                    ) : (
+                                      chunk
+                                    ),
+                                  )}
                               </p>
                             );
                           })}
@@ -352,16 +448,30 @@ export default function ChatPanel({
                               className="text-slate-400 flex items-center space-x-1 text-xs bg-slate-50 px-2 py-1 rounded-md"
                             >
                               {copiedId === msg.id ? (
-                                <><Check size={14} className="text-emerald-500" /><span>Copied!</span></>
+                                <>
+                                  <Check
+                                    size={14}
+                                    className="text-emerald-500"
+                                  />
+                                  <span>Copied!</span>
+                                </>
                               ) : (
-                                <><Copy size={14} /><span>Copy</span></>
+                                <>
+                                  <Copy size={14} />
+                                  <span>Copy</span>
+                                </>
                               )}
                             </button>
                             {msg.sources && msg.sources.length > 0 && (
                               <div className="flex items-center space-x-1 flex-wrap">
-                                <span className="text-slate-400 text-xs">Sources:</span>
+                                <span className="text-slate-400 text-xs">
+                                  Sources:
+                                </span>
                                 {msg.sources.map((page) => (
-                                  <span key={page} className="text-xs bg-cyan-50 text-cyan-600 border border-cyan-100 px-2 py-0.5 rounded font-medium">
+                                  <span
+                                    key={page}
+                                    className="text-xs bg-cyan-50 text-cyan-600 border border-cyan-100 px-2 py-0.5 rounded font-medium"
+                                  >
                                     p.{page}
                                   </span>
                                 ))}
@@ -370,7 +480,11 @@ export default function ChatPanel({
                           </div>
                         )}
                       </div>
-                      <div className={`text-[11px] text-slate-400 mt-1.5 px-1 ${msg.sender === "user" ? "text-right" : "text-left"}`}>
+                      <div
+                        className={`text-[11px] text-slate-400 mt-1.5 px-1 ${
+                          msg.sender === "user" ? "text-right" : "text-left"
+                        }`}
+                      >
                         {msg.timestamp}
                       </div>
                     </div>

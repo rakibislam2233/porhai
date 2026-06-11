@@ -39,7 +39,7 @@ export const POST = async (request: NextRequest) => {
 
     const db = getDb(env);
 
-    // Step 1: Question emabedding
+    // Step 1: Question embedding
     const queryEmbedding = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
       text: question,
     });
@@ -51,7 +51,7 @@ export const POST = async (request: NextRequest) => {
       );
     }
 
-    // Step 2: Vector similarity find top 5 relevant chunks
+    // Step 2: Vector similarity — top 5 relevant chunks
     const similarChunks = await db.execute(sql`
       SELECT content, page_number
       FROM chunks
@@ -65,7 +65,7 @@ export const POST = async (request: NextRequest) => {
       .map((c) => `[Page ${c.page_number}]: ${c.content}`)
       .join("\n\n");
 
-    // Step 3: AI to generate answer with context + question + history
+    // Step 3: AI stream response
     const aiResponse = await env.AI.run(
       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       {
@@ -92,35 +92,50 @@ ${context}`,
           ...history,
           { role: "user", content: question },
         ],
+        stream: true,
       },
     );
 
-    const answer =
-      typeof aiResponse === "string"
-        ? aiResponse
-        : "response" in aiResponse
-          ? (aiResponse.response ?? "")
-          : "";
-
+    // Step 4: TransformStream — token collect + DB save on flush
+    let fullAnswer = "";
     const sources = [...new Set(chunkRows.map((c) => c.page_number))];
 
-    // Step 4: Message database এ question + answer + sources save
-    await db.insert(chatMessages).values([
-      {
-        sessionId,
-        role: "user",
-        content: question,
-        sources: null,
+    const transform = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        for (const line of text.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(json);
+            if (parsed.response) fullAnswer += parsed.response;
+          } catch {}
+        }
+        controller.enqueue(chunk);
       },
-      {
-        sessionId,
-        role: "assistant",
-        content: answer,
-        sources,
+      async flush() {
+        if (!fullAnswer) return;
+        try {
+          await db.insert(chatMessages).values([
+            { sessionId, role: "user", content: question, sources: null },
+            { sessionId, role: "assistant", content: fullAnswer, sources },
+          ]);
+          console.log("=== DB SAVE SUCCESS ===");
+        } catch (err) {
+          console.error("=== DB SAVE FAILED ===", err);
+        }
       },
-    ]);
+    });
+    (aiResponse as ReadableStream).pipeTo(transform.writable);
 
-    return NextResponse.json({ answer, sources });
+    return new Response(transform.readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Sources": JSON.stringify(sources),
+      },
+    });
   } catch (error) {
     console.error("Chat answer failed:", error);
     return NextResponse.json(

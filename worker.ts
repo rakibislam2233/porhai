@@ -1,6 +1,6 @@
 // @ts-ignore
 import openNextWorker from "./.open-next/worker.js";
-export { ChatRoomDO } from "./src/durable-objects/chat-room"; 
+// export { ChatRoomDO } from "./src/durable-objects/chat-room"; 
 export { PorhaiWorkflow } from "./src/workflows/pdf-processor";
 
 export default {

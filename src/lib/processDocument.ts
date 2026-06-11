@@ -29,11 +29,15 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
 
     // Step 2: Extract chunks
     const pdf = await getPdfDocument({ data: uint8 }).promise;
+    console.log("Pdf", pdf);
     const allChunks: { content: string; pageNumber: number }[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
+      console.log(`Extracting text from page ${pageNum}...`);
       const textContent = await page.getTextContent();
+
+      console.log(`Page ${pageNum} has ${textContent.items.length} text items`);
       const pageText = textContent.items.map((item: any) => item.str).join(" ");
 
       if (!pageText.trim()) continue;
@@ -54,7 +58,7 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
       }
     }
 
-    console.log(`Extracted ${allChunks.length} chunks from PDF`);
+    console.log(`Extracted ${JSON.stringify(allChunks)} chunks from PDF`);
 
     // Step 3: Embed and save
     for (const chunk of allChunks) {
