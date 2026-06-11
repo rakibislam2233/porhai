@@ -46,7 +46,7 @@ export const POST = async (request: NextRequest) => {
     // Step 2: Query Vectorize
     const results = await env.VECTORIZE.query(queryEmbedding.data[0], {
       topK: 5,
-      filter: { id: "7abe751e-c6eb-45cd-8449-619347d2d5a7" },
+      returnValues: true,
       returnMetadata: "all",
     });
 
