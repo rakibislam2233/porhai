@@ -1,5 +1,5 @@
 "use client";
-'use client';
+"use client";
 import { useChatSession } from "@/hooks/useChatSession";
 import { Message, PDFDocument } from "@/types/chat";
 import {
@@ -102,19 +102,6 @@ export default function ChatPanel({
     setIsTyping(true);
 
     const assistantId = `assistant-${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: assistantId,
-        sender: "assistant",
-        text: "",
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      },
-    ]);
-
     try {
       const history = messages
         .filter((m) => m.id !== "welcome")
@@ -135,26 +122,18 @@ export default function ChatPanel({
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        console.error("API ERROR:", res.status, err);
-        throw new Error(`API responded with ${res.status}`);
-      }
-
-      if (!res.body) {
-        throw new Error("Response body is null");
-      }
+      if (!res.ok) throw new Error(`API responded with ${res.status}`);
+      if (!res.body) throw new Error("Response body is null");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-
-      setIsTyping(false);
-
       let buffer = "";
+      let firstChunk = true;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -162,31 +141,59 @@ export default function ChatPanel({
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
+          if (json === "[DONE]") continue;
           try {
             const parsed = JSON.parse(json);
             const token = parsed.response;
             if (token) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, text: m.text + token } : m,
-                ),
-              );
+              if (firstChunk) {
+                setIsTyping(false);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: assistantId,
+                    sender: "assistant",
+                    text: token,
+                    timestamp: new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  },
+                ]);
+                firstChunk = false;
+              } else {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          text: String(m.text || "") + String(token || ""),
+                        }
+                      : m,
+                  ),
+                );
+              }
             }
           } catch (e) {
-            console.error("PARSE ERROR:", e, "LINE:", line);
+            console.error("PARSE ERROR:", e);
           }
         }
       }
     } catch (e) {
       console.error("STREAM ERROR:", e);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, text: "Something went wrong. Please try again." }
-            : m,
-        ),
-      );
+      setIsTyping(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          sender: "assistant",
+          text: "Something went wrong. Please try again.",
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ]);
     } finally {
       setIsTyping(false);
     }
@@ -238,7 +245,6 @@ export default function ChatPanel({
         )}
       </AnimatePresence>
 
-      {/* SIDEBAR — AnimatePresence এর বাইরে */}
       <aside
         className={`
           fixed inset-y-0 left-0 w-80 bg-white border-r border-slate-200
@@ -383,6 +389,7 @@ export default function ChatPanel({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
+                            
                             p: ({ children }) => (
                               <p
                                 className={`mb-2 last:mb-0 ${msg.sender === "user" ? "text-white" : "text-slate-800"}`}
@@ -458,7 +465,7 @@ export default function ChatPanel({
                             },
                           }}
                         >
-                          {msg.text}
+                         {String(msg.text || "")}
                         </ReactMarkdown>
 
                         {msg.sender === "assistant" && (

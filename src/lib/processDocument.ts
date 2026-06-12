@@ -27,22 +27,40 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
     // Step 3: Text extract and chunk
     const pdf = await getPdfDocument({ data: uint8Array }).promise;
     const allChunks: { content: string; pageNumber: number }[] = [];
+
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
+      const [textContent, annotations] = await Promise.all([
+        page.getTextContent(),
+        page.getAnnotations(),
+      ]);
+
+      // Broken URL fix + raw text
+      const rawText = textContent.items
         .map((item: any) => item.str)
         .join(" ")
+        .replace(/(\S+)\.\s+(\S+)/g, "$1.$2")
         .trim();
 
-      if (!pageText) continue;
+      // Annotation links
+      const linkTexts = annotations
+        .filter((a: any) => a.subtype === "Link" && a.url)
+        .map((a: any) => `[Link: ${a.url}]`);
 
-      // Sentence-aware chunking
+      if (linkTexts.length > 0) {
+        allChunks.push({
+          content: `Page ${pageNum} Links: ${linkTexts.join(", ")}`,
+          pageNumber: pageNum,
+        });
+      }
+
+      const pageText = rawText;
+      if (!pageText) continue;
       const sentences = pageText.match(/[^.!?]+[.!?]+/g) || [pageText];
       let current = "";
 
       for (const sentence of sentences) {
-        if ((current + sentence).length > 800) {
+        if ((current + sentence).length > 1200) {
           if (current.trim()) {
             allChunks.push({ content: current.trim(), pageNumber: pageNum });
           }
@@ -54,13 +72,14 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
       if (current.trim()) {
         allChunks.push({ content: current.trim(), pageNumber: pageNum });
       }
+      console.log(`\n========== PAGE ${pageNum} ==========`);
+      console.log("RAW TEXT:", rawText);
+      console.log("LINKS:", linkTexts);
     }
 
-    // Step 4: Embed and upsert into Vectorize in batches
+    // Embed and upsert
     const BATCH_SIZE = 10;
     const vectors: VectorizeVector[] = [];
-
-    console.log("All Chunk", allChunks);
 
     for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
       const batch = allChunks.slice(i, i + BATCH_SIZE);
@@ -69,13 +88,10 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
           const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
             text: chunk.content,
           });
-          if (!result || !("data" in result) || !result.data?.[0]) {
-            return null;
-          }
-          const globalIndex = i + j;
-          console.log("Id", `${documentId}-${globalIndex}`);
+          if (!result || !("data" in result) || !result.data?.[0]) return null;
+
           return {
-            id: `${documentId}-${globalIndex}`,
+            id: `${documentId}-${i + j}`,
             values: result.data[0],
             metadata: {
               documentId,
@@ -85,14 +101,15 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
           };
         }),
       );
+
       for (const vec of batchVectors) {
         if (vec) vectors.push(vec);
       }
     }
 
-    // Single upsert call
     if (vectors.length > 0) {
       await env.VECTORIZE.upsert(vectors);
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // 5 seconds delay after upsert
     }
 
     // Step 5: Mark as completed

@@ -40,26 +40,32 @@ export const POST = async (request: NextRequest) => {
       return NextResponse.json({ error: "Embedding failed" }, { status: 500 });
     }
 
-    console.log("Query Embedding", queryEmbedding.data[0]);
-    console.log("Document ID", documentId);
+    // Step 2
+    console.log("Querying with documentId:", documentId);
+    console.log("My Question", question);
 
-    // Step 2: Query Vectorize
     const results = await env.VECTORIZE.query(queryEmbedding.data[0], {
-      topK: 5,
-      returnValues: true,
+      topK: 10,
+      filter: {
+        documentId: { $eq: documentId },
+      },
+      returnValues: false,
       returnMetadata: "all",
     });
 
-    console.log("Vector Search", results);
+    console.log("Vector Result", results);
 
     // Step 3: Filter by similarity score and build context
-    const relevantMatches = results.matches.filter(
-      (m) => (m.score ?? 0) > 0.55,
-    );
-
+    const relevantMatches = results.matches.filter((m) => (m.score ?? 0) > 0.2);
     const context = relevantMatches
       .map((m) => `[Page ${m.metadata?.pageNumber}]: ${m.metadata?.content}`)
       .join("\n\n");
+
+    const finalContext =
+      context.trim() ||
+      results.matches
+        .map((m) => `[Page ${m.metadata?.pageNumber}]: ${m.metadata?.content}`)
+        .join("\n\n");
 
     // Step 4: Stream AI response
     const aiResponse = await env.AI.run(
@@ -68,7 +74,16 @@ export const POST = async (request: NextRequest) => {
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant for document Q&A.
+            content: `You are a strict document Q&A assistant.
+
+CRITICAL RULES:
+- Answer ONLY using the exact information from the document context below
+- Do NOT add, infer, or assume any information not present in the context
+- Do NOT generate information from your training data
+- If information is not in the context, say: "এই তথ্য document-এ নেই"
+- Be concise, avoid repetition
+- Never leave a sentence incomplete
+- Mention page numbers when referencing content
 
 LANGUAGE RULE:
 - Bengali script → reply in Bengali
@@ -81,30 +96,31 @@ FORMATTING RULES:
 - Use numbered lists for steps
 - Use ### for section headings
 - Use markdown tables for comparisons
-- Add blank line between paragraphs
 
-ANSWER RULES:
-- Answer ONLY from the document context below
-- Mention page numbers when referencing content
-- If answer not in context, say so clearly
-
-Document Context:
-${context}`,
+Document Context (use ONLY this):
+${finalContext}`,
           },
           ...history.slice(-6),
           { role: "user", content: question },
         ],
         stream: true,
+        max_tokens: 2048,
       },
     );
 
     // Step 5: Stream + save to DB on flush
     let fullAnswer = "";
+    let buffer = "";
+    const decoder = new TextDecoder();
 
     const transform = new TransformStream({
       transform(chunk, controller) {
-        const text = new TextDecoder().decode(chunk);
-        for (const line of text.split("\n")) {
+        buffer += decoder.decode(chunk, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const json = line.slice(6).trim();
           if (json === "[DONE]") continue;
@@ -113,9 +129,22 @@ ${context}`,
             if (parsed.response) fullAnswer += parsed.response;
           } catch {}
         }
+
         controller.enqueue(chunk);
       },
       async flush() {
+        // Remaining buffer process and save
+        const remaining = buffer + decoder.decode();
+        if (remaining.startsWith("data: ")) {
+          const json = remaining.slice(6).trim();
+          if (json && json !== "[DONE]") {
+            try {
+              const parsed = JSON.parse(json);
+              if (parsed.response) fullAnswer += parsed.response;
+            } catch {}
+          }
+        }
+
         if (!fullAnswer) return;
         try {
           const db = getDb(env);
@@ -129,7 +158,7 @@ ${context}`,
       },
     });
 
-    (aiResponse as ReadableStream).pipeTo(transform.writable);
+    (aiResponse as unknown as ReadableStream).pipeTo(transform.writable);
 
     return new Response(transform.readable, {
       headers: {
