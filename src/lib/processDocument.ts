@@ -114,7 +114,6 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
     console.log(
       `Document ${documentId} processed — ${vectors.length} vectors stored`,
     );
-    await waitForVectorizeIndex(env, documentId, Array.from(vectors[0].values));
     // Step 5: Mark as completed
     await db
       .update(documents)
