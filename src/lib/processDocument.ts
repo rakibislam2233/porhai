@@ -109,7 +109,8 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
     }
 
     if (vectors.length > 0) {
-      await env.VECTORIZE.upsert(vectors);
+      const res = await env.VECTORIZE.upsert(vectors);
+      console.log("Upsert result:", res);
     }
     console.log(
       `Document ${documentId} processed — ${vectors.length} vectors stored`,
