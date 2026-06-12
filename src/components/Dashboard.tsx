@@ -70,8 +70,6 @@ export default function Dashboard({ documents, onSelectDoc, onDeleteDoc }: Dashb
   };
 
   const handleDeleteAccount = () => {
-    // Placeholder for real delete logic
-    alert('Account deletion requested. This would be handled by the backend.');
     setDeleteConfirmOpen(false);
   };
 

@@ -47,7 +47,6 @@ export default function DashboardClient() {
   const handleDeleteDoc = async (id: string) => {
     const previousDocs = [...documents];
     setDocuments((prev) => prev.filter((d) => d.id !== id));
-
     try {
       const response = await fetch(`/api/documents/${id}`, {
         method: 'DELETE',

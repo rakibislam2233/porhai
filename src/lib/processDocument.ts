@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { documents } from "./db/schema";
+import { waitForVectorizeIndex } from "./waitForVectorizeIndex";
 const { getDocument: getPdfDocument } = await import("pdfjs-serverless");
 
 export async function processDocument(env: CloudflareEnv, documentId: string) {
@@ -109,18 +110,16 @@ export async function processDocument(env: CloudflareEnv, documentId: string) {
 
     if (vectors.length > 0) {
       await env.VECTORIZE.upsert(vectors);
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // 5 seconds delay after upsert
-    }
-
+    }\
+    console.log(
+      `Document ${documentId} processed — ${vectors.length} vectors stored`,
+    );
+    await waitForVectorizeIndex(env, documentId, Array.from(vectors[0].values));
     // Step 5: Mark as completed
     await db
       .update(documents)
       .set({ status: "completed" })
       .where(eq(documents.id, documentId));
-
-    console.log(
-      `Document ${documentId} processed — ${vectors.length} vectors stored`,
-    );
   } catch (error) {
     console.error(`Processing failed for ${documentId}:`, error);
     await db
