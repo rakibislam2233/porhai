@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import {documents } from "@/lib/db/schema";
+import { documents } from "@/lib/db/schema";
 import {
   WorkflowEntrypoint,
   WorkflowStep,
@@ -7,45 +7,43 @@ import {
 } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 
+type WorkflowParams = {
+  documentId: string;
+  userId: string;
+};
+
 export class PorhaiWorkflow extends WorkflowEntrypoint<
   CloudflareEnv,
-  { documentId: string; userId: string }
+  WorkflowParams
 > {
-  async run(
-    event: WorkflowEvent<{ documentId: string; userId: string }>,
-    step: WorkflowStep,
-  ) {
+  async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
     const { documentId } = event.payload;
     const db = getDb(this.env);
 
-    // 🛠️ Step 1: Fetch PDF from Database URL (No fs dependency)
+    // Step 1: Fetch PDF
     const pdfBufferData = await step.do("fetch-pdf", async () => {
       const doc = await db.query.documents.findFirst({
         where: eq(documents.id, documentId),
       });
       if (!doc) throw new Error("Document not found");
-      const targetUrl = doc.fileUrl;
-      if (!targetUrl) throw new Error("No file URL found in document record");
+      if (!doc.fileUrl) throw new Error("No file URL found in document record");
 
-      const response = await fetch(targetUrl);
+      const response = await fetch(doc.fileUrl);
       if (!response.ok)
         throw new Error(
           `Failed to fetch PDF from storage: ${response.statusText}`,
         );
 
       const fileBuffer = await response.arrayBuffer();
-
       return {
         buffer: Array.from(new Uint8Array(fileBuffer)),
         fileName: doc.fileName,
       };
     });
 
-    if (!pdfBufferData) {
-      throw new Error("Failed to read local PDF file data");
-    }
+    if (!pdfBufferData) throw new Error("Failed to read PDF data");
 
-    // 🛠️ Step 2: Process the PDF (Sentence-Aware Chunking)
+    // Step 2: Extract chunks (text + annotation links)
     const extractedChunks = await step.do("extract-chunks", async () => {
       const { getDocument } = await import("pdfjs-serverless");
       const uint8 = new Uint8Array(pdfBufferData.buffer);
@@ -54,18 +52,35 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
+        const [textContent, annotations] = await Promise.all([
+          page.getTextContent(),
+          page.getAnnotations(),
+        ]);
+
+        const rawText = textContent.items
           .map((item: any) => item.str)
           .join(" ")
+          .replace(/(\S+)\.\s+(\S+)/g, "$1.$2")
           .trim();
 
-        if (!pageText) continue;
-        const sentences = pageText.match(/[^.!?]+[.!?]+/g) || [pageText];
+        const linkTexts = (annotations as any[])
+          .filter((a) => a.subtype === "Link" && a.url)
+          .map((a) => `[Link: ${a.url}]`);
+
+        if (linkTexts.length > 0) {
+          allChunks.push({
+            content: `Page ${pageNum} Links: ${linkTexts.join(", ")}`,
+            pageNumber: pageNum,
+          });
+        }
+
+        if (!rawText) continue;
+
+        const sentences = rawText.match(/[^.!?]+[.!?]+/g) || [rawText];
         let current = "";
 
         for (const sentence of sentences) {
-          if ((current + sentence).length > 800) {
+          if ((current + sentence).length > 1200) {
             if (current.trim()) {
               allChunks.push({ content: current.trim(), pageNumber: pageNum });
             }
@@ -78,10 +93,11 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
           allChunks.push({ content: current.trim(), pageNumber: pageNum });
         }
       }
+
       return allChunks;
     });
 
-    // 🛠️ Step 3: Embed, Save to Vectorize & Drizzle DB in Batches
+    // Step 3: Embed and upsert to Vectorize
     await step.do("embed-and-save", async () => {
       const BATCH_SIZE = 10;
       const vectors: VectorizeVector[] = [];
@@ -104,45 +120,34 @@ export class PorhaiWorkflow extends WorkflowEntrypoint<
                 return null;
               }
 
-              const globalIndex = i + j;
-
               return {
-                id: `${documentId}-${globalIndex}`,
+                id: `${documentId}-${i + j}`,
                 values: embeddingResult.data[0],
                 metadata: {
                   documentId,
                   content: chunk.content,
                   pageNumber: chunk.pageNumber,
                 },
-                dbData: {
-                  documentId,
-                  content: chunk.content,
-                  pageNumber: chunk.pageNumber,
-                  embedding: embeddingResult.data[0],
-                },
               };
             } catch (err) {
-              console.error("Embedding chunk failed", err);
+              console.error("Embedding chunk failed:", err);
               return null;
             }
           }),
         );
+
         for (const vec of batchVectors) {
-          if (vec) {
-            vectors.push({
-              id: vec.id,
-              values: vec.values,
-              metadata: vec.metadata,
-            });
-          }
+          if (vec) vectors.push(vec);
         }
       }
-      if (vectors.length > 0 && this.env.VECTORIZE) {
+
+      if (vectors.length > 0) {
         await this.env.VECTORIZE.upsert(vectors);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     });
 
-    // 🛠️ Step 4: Update the document status in the database & KV
+    // Step 4: Mark as completed
     await step.do("update-document-status", async () => {
       await db
         .update(documents)

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   // Local calculation dynamic formatting
   const docsWithUrls = docs.map((doc) => {
-    const fileUrl = doc.b2Url || null;
+    const fileUrl = doc.fileUrl || null;
 
     const sizeInMB = doc.fileSize
       ? doc.fileSize > 1024 * 1024
@@ -36,9 +36,8 @@ export async function GET(req: NextRequest) {
       name: doc.fileName,
       size: sizeInMB,
       uploadedAt: doc.createdAt,
-      pageCount: doc.pageCount,
       status: doc.status,
-      b2Url: fileUrl,
+      fileUrl: fileUrl,
     };
   });
 

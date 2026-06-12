@@ -77,7 +77,7 @@ export const POST = async (request: NextRequest) => {
       })
       .returning();
 
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NEXTJS_ENV || env.NEXTJS_ENV === "development") {
       await processDocument(env, doc.id);
     } else {
       if (env.KV)
